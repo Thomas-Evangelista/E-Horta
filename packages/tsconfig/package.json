@@ -1,0 +1,11 @@
+{
+  "name": "@e-horta/tsconfig",
+  "version": "1.0.0",
+  "private": true,
+  "license": "MIT",
+  "files": [
+    "base.json",
+    "nextjs.json",
+    "nest.json"
+  ]
+}

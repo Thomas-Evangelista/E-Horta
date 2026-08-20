@@ -1,0 +1,43 @@
+{
+  "name": "e-horta",
+  "private": true,
+  "description": "Plataforma de e-commerce de hortaliças e produtos frescos",
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @e-horta/api run dev",
+    "dev:api": "pnpm --filter @e-horta/api run dev",
+    "dev:web": "pnpm --filter @e-horta/web run dev",
+    "dev:admin": "pnpm --filter @e-horta/admin run dev",
+    "build": "pnpm --filter @e-horta/api run build",
+    "build:api": "pnpm --filter @e-horta/api run build",
+    "build:web": "pnpm --filter @e-horta/web run build",
+    "build:admin": "pnpm --filter @e-horta/admin run build",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "typecheck": "pnpm -r run typecheck",
+    "test": "pnpm -r run test",
+    "test:watch": "pnpm -r run test:watch",
+    "db:generate": "pnpm --filter @e-horta/api run db:generate",
+    "db:migrate": "pnpm --filter @e-horta/api run db:migrate",
+    "db:seed": "pnpm --filter @e-horta/api run db:seed",
+    "db:reset": "pnpm --filter @e-horta/api run db:reset",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f"
+  },
+  "devDependencies": {
+    "@e-horta/eslint-config": "workspace:*",
+    "@e-horta/tsconfig": "workspace:*",
+    "@prisma/client": "6.19.3",
+    "eslint": "^9.0.0",
+    "prettier": "^3.3.0",
+    "prisma": "6.19.3",
+    "typescript": "^5.7.0"
+  },
+  "packageManager": "pnpm@9.15.0"
+}
