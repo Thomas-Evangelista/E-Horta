@@ -378,6 +378,18 @@ model Notification {
   @@map("notifications")
 }
 
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String   @unique @map("user_id")
+  tokenHash String   @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
 model WebhookEvent {
   id         String    @id @default(uuid())
   provider   String
