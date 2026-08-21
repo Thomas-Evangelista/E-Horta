@@ -198,9 +198,9 @@ export class AuthService {
 
     await this.prisma.$executeRaw`
       INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at, created_at)
-      VALUES (gen_random_uuid()::text, ${userId}, ${tokenHash}, ${expiresAt.toISOString()}, NOW())
+      VALUES (gen_random_uuid()::text, ${userId}, ${tokenHash}, ${expiresAt}, NOW())
       ON CONFLICT (user_id) DO UPDATE
-      SET token_hash = ${tokenHash}, expires_at = ${expiresAt.toISOString()}, created_at = NOW()
+      SET token_hash = ${tokenHash}, expires_at = ${expiresAt}, created_at = NOW()
     `;
   }
 
