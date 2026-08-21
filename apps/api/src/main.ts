@@ -6,7 +6,8 @@ import helmet from 'helmet';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // rawBody é necessário para validar a assinatura HMAC dos webhooks.
+  const app = await NestFactory.create(AppModule, { rawBody: true });
   const configService = app.get(ConfigService);
   const logger = new Logger('Bootstrap');
 
@@ -30,7 +31,9 @@ async function bootstrap() {
     }),
   );
 
-  if (configService.get<string>('NODE_ENV') !== 'production') {
+  const isProduction = configService.get<string>('NODE_ENV') === 'production';
+
+  if (!isProduction) {
     const config = new DocumentBuilder()
       .setTitle('E-Horta API')
       .setDescription('API da plataforma de e-commerce de hortaliças e produtos frescos')
@@ -46,7 +49,10 @@ async function bootstrap() {
   await app.listen(port);
 
   logger.log(`Application running on port ${port}`);
-  logger.log(`Swagger docs available at http://localhost:${port}/api/docs`);
+
+  if (!isProduction) {
+    logger.log(`Swagger docs available at http://localhost:${port}/api/docs`);
+  }
 }
 
 bootstrap();

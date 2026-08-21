@@ -322,9 +322,27 @@ export class CartService {
       return activeCart;
     }
 
-    return this.prisma.cart.create({
-      data: { userId, status: 'ACTIVE' },
-    });
+    try {
+      return await this.prisma.cart.create({
+        data: { userId, status: 'ACTIVE' },
+      });
+    } catch (error) {
+      // Corrida entre duas requisições simultâneas: a unique em carts.user_id
+      // rejeita o segundo INSERT. Basta reaproveitar o carrinho criado pela
+      // requisição vencedora.
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        const winner = await this.prisma.cart.findFirst({
+          where: { userId, status: 'ACTIVE' },
+          orderBy: { createdAt: 'desc' },
+        });
+
+        if (winner) {
+          return winner;
+        }
+      }
+
+      throw error;
+    }
   }
 
   async resolveActiveCart(owner: CartOwner) {

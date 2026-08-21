@@ -45,6 +45,7 @@ export interface OrderDetail {
     amount: number;
     paidAt: Date | null;
   } | null;
+  paymentAttempts: number;
 }
 
 @Injectable()
@@ -103,7 +104,8 @@ export class OrdersService {
       include: {
         items: { orderBy: { id: 'asc' } },
         shipping: true,
-        payment: true,
+        payments: { orderBy: { createdAt: 'desc' }, take: 1 },
+        _count: { select: { payments: true } },
       },
     });
 
@@ -112,6 +114,9 @@ export class OrdersService {
     }
 
     const toNumber = (value: Prisma.Decimal) => value.toNumber();
+
+    // Última tentativa de pagamento (a mais recente) é a relevante.
+    const latestPayment = order.payments[0] ?? null;
 
     return {
       id: order.id,
@@ -142,14 +147,15 @@ export class OrdersService {
             estimatedDays: order.shipping.estimatedDays,
           }
         : null,
-      payment: order.payment
+      payment: latestPayment
         ? {
-            method: order.payment.method,
-            status: order.payment.status,
-            amount: toNumber(order.payment.amount),
-            paidAt: order.payment.paidAt,
+            method: latestPayment.method,
+            status: latestPayment.status,
+            amount: toNumber(latestPayment.amount),
+            paidAt: latestPayment.paidAt,
           }
         : null,
+      paymentAttempts: order._count.payments,
     };
   }
 }

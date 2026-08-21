@@ -4,6 +4,8 @@ import { Prisma } from '@prisma/client';
 import { CheckoutService } from './checkout.service';
 import { CartService } from '../cart/cart.service';
 import { ShippingService } from '../shipping/shipping.service';
+import { InventoryService } from '../inventory/inventory.service';
+import { PaymentsService } from '../payments/payments.service';
 import { PrismaService } from '../../database/prisma.service';
 
 describe('CheckoutService', () => {
@@ -21,6 +23,8 @@ describe('CheckoutService', () => {
   };
   let cartService: { resolveActiveCart: jest.Mock };
   let shippingService: { getMethodConfig: jest.Mock };
+  let inventoryService: { reserveItems: jest.Mock; releaseReservations: jest.Mock };
+  let paymentsService: { createInitialCharge: jest.Mock };
 
   const userId = 'user-1';
   const addressId = '0b8f6c1a-1111-4222-8333-444455556666';
@@ -68,7 +72,6 @@ describe('CheckoutService', () => {
       coupon: overrides.coupon ?? null,
       items: overrides.items ?? [makeCartItem()],
     });
-    prisma.$executeRaw.mockResolvedValue(1);
     prisma.order.create.mockImplementation(
       async ({ data }: { data: Record<string, unknown> }) => ({
         id: 'order-1',
@@ -92,14 +95,25 @@ describe('CheckoutService', () => {
             total: new Prisma.Decimal('13.80'),
           },
         ],
-        payment: {
-          id: 'payment-1',
-          method: dto.paymentMethod,
-          status: 'PENDING',
-          amount: data.total,
-        },
+        payments: [
+          {
+            id: 'payment-1',
+            method: dto.paymentMethod,
+            status: 'PENDING',
+            amount: data.total,
+          },
+        ],
       }),
     );
+  };
+
+  const sandboxCharge = {
+    provider: 'sandbox',
+    transactionId: 'EHSBXTEST123',
+    status: 'PENDING' as const,
+    qrCode: '00020126SANDBOX',
+    expiresAt: new Date('2026-08-21T13:00:00Z'),
+    metadata: null,
   };
 
   beforeEach(async () => {
@@ -124,12 +138,23 @@ describe('CheckoutService', () => {
       }),
     };
 
+    inventoryService = {
+      reserveItems: jest.fn().mockResolvedValue(undefined),
+      releaseReservations: jest.fn().mockResolvedValue(undefined),
+    };
+
+    paymentsService = {
+      createInitialCharge: jest.fn().mockResolvedValue(null),
+    };
+
     const moduleRef = await Test.createTestingModule({
       providers: [
         CheckoutService,
         { provide: PrismaService, useValue: prisma },
         { provide: CartService, useValue: cartService },
         { provide: ShippingService, useValue: shippingService },
+        { provide: InventoryService, useValue: inventoryService },
+        { provide: PaymentsService, useValue: paymentsService },
       ],
     }).compile();
 
@@ -142,12 +167,15 @@ describe('CheckoutService', () => {
   it('deve criar pedido com reserva de estoque, pagamento pendente e carrinho convertido', async () => {
     const result = await service.checkout(userId, dto);
 
-    expect(prisma.$executeRaw).toHaveBeenCalled();
+    expect(inventoryService.reserveItems).toHaveBeenCalledWith(
+      expect.anything(),
+      [expect.objectContaining({ productId: 'product-1', quantity: 2 })],
+    );
 
     expect(prisma.order.create).toHaveBeenCalledTimes(1);
     expect(prisma.cart.update).toHaveBeenCalledWith({
       where: { id: 'cart-1' },
-      data: { status: 'CONVERTED', couponId: null },
+      data: { status: 'CONVERTED', couponId: null, userId: null },
     });
     expect(prisma.cartItem.deleteMany).toHaveBeenCalledWith({ where: { cartId: 'cart-1' } });
 
@@ -155,6 +183,31 @@ describe('CheckoutService', () => {
     expect(result.order.status).toBe('PENDING_PAYMENT');
     expect(result.payment.status).toBe('PENDING');
     expect(result.order.total).toBeCloseTo(23.7); // 13.80 - 0 + 9.90
+  });
+
+  it('deve criar cobrança no gateway e retornar dados do Pix na resposta', async () => {
+    paymentsService.createInitialCharge.mockResolvedValue(sandboxCharge);
+
+    const result = await service.checkout(userId, dto);
+
+    expect(paymentsService.createInitialCharge).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'payment-1', method: 'PIX' }),
+      expect.objectContaining({ id: 'order-1' }),
+    );
+    expect(result.payment.charge).toMatchObject({
+      provider: 'sandbox',
+      transactionId: 'EHSBXTEST123',
+      qrCode: '00020126SANDBOX',
+    });
+  });
+
+  it('deve retornar charge null quando o gateway falha (pedido permanece válido)', async () => {
+    paymentsService.createInitialCharge.mockResolvedValue(null);
+
+    const result = await service.checkout(userId, dto);
+
+    expect(result.order.status).toBe('PENDING_PAYMENT');
+    expect(result.payment.charge).toBeNull();
   });
 
   it('deve recalcular preços a partir do preço atual dos produtos', async () => {
@@ -175,7 +228,7 @@ describe('CheckoutService', () => {
     await expect(service.checkout(userId, dto)).rejects.toMatchObject({
       response: { code: 'USER_INACTIVE' },
     });
-    expect(prisma.$executeRaw).not.toHaveBeenCalled();
+    expect(inventoryService.reserveItems).not.toHaveBeenCalled();
   });
 
   it('deve lançar NotFoundException quando endereço não pertence ao usuário', async () => {
@@ -213,12 +266,17 @@ describe('CheckoutService', () => {
     await expect(service.checkout(userId, dto)).rejects.toMatchObject({
       response: { code: 'OUT_OF_STOCK' },
     });
-    expect(prisma.$executeRaw).not.toHaveBeenCalled();
+    expect(inventoryService.reserveItems).not.toHaveBeenCalled();
     expect(prisma.order.create).not.toHaveBeenCalled();
   });
 
   it('deve lançar OUT_OF_STOCK quando a reserva condicional falha na escrita', async () => {
-    prisma.$executeRaw.mockResolvedValue(0);
+    inventoryService.reserveItems.mockRejectedValue(
+      new ConflictException({
+        code: 'OUT_OF_STOCK',
+        message: 'Produto "Alface" sem estoque disponível',
+      }),
+    );
 
     await expect(service.checkout(userId, dto)).rejects.toMatchObject({
       response: { code: 'OUT_OF_STOCK' },
@@ -297,12 +355,12 @@ describe('CheckoutService', () => {
         coupon: { ...coupon, minimumOrderValue: new Prisma.Decimal(100) },
       });
 
-      await expect(service.checkout(userId, dto)).rejects.toMatchObject({
-        response: { code: 'MINIMUM_ORDER_VALUE' },
-      });
-      expect(prisma.$executeRaw).not.toHaveBeenCalled();
-      expect(prisma.order.create).not.toHaveBeenCalled();
+    await expect(service.checkout(userId, dto)).rejects.toMatchObject({
+      response: { code: 'MINIMUM_ORDER_VALUE' },
     });
+    expect(inventoryService.reserveItems).not.toHaveBeenCalled();
+    expect(prisma.order.create).not.toHaveBeenCalled();
+  });
   });
 
   it('deve propagar BadRequestException em validações de entrada', async () => {

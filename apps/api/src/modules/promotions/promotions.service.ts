@@ -1,16 +1,8 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { CartService, type CartOwner, type CartResponse } from '../cart/cart.service';
-import { findPromotionIneligibility } from '../../common/utils/promotion-calculator';
+import { findPromotionIneligibility, getIneligibilityMessage } from '../../common/utils/promotion-calculator';
 import type { ApplyCouponDto } from './promotions.validation';
-
-const INELIGIBILITY_MESSAGES: Record<string, string> = {
-  PROMOTION_INACTIVE: 'Cupom inativo',
-  PROMOTION_NOT_STARTED: 'Cupom ainda não está válido',
-  PROMOTION_EXPIRED: 'Cupom expirado',
-  PROMOTION_USAGE_LIMIT: 'Cupom atingiu o limite de uso',
-  MINIMUM_ORDER_VALUE: 'Valor mínimo do pedido não atingido para este cupom',
-};
 
 @Injectable()
 export class PromotionsService {
@@ -41,7 +33,7 @@ export class PromotionsService {
     if (ineligibility) {
       throw new BadRequestException({
         code: ineligibility,
-        message: INELIGIBILITY_MESSAGES[ineligibility] ?? 'Cupom inválido',
+        message: getIneligibilityMessage(ineligibility),
       });
     }
 

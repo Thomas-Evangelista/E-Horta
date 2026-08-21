@@ -11,16 +11,14 @@ import { Prisma, type OrderStatus, type PaymentStatus, type ShippingStatus } fro
 import { randomBytes } from 'crypto';
 import { CartService } from '../cart/cart.service';
 import { ShippingService } from '../shipping/shipping.service';
-import { findPromotionIneligibility, applyPromotion } from '../../common/utils/promotion-calculator';
+import { InventoryService } from '../inventory/inventory.service';
+import { PaymentsService, type PaymentChargeView } from '../payments/payments.service';
+import {
+  findPromotionIneligibility,
+  applyPromotion,
+  getIneligibilityMessage,
+} from '../../common/utils/promotion-calculator';
 import type { CheckoutDto } from './checkout.validation';
-
-const INELIGIBILITY_MESSAGES: Record<string, string> = {
-  PROMOTION_INACTIVE: 'Cupom inativo',
-  PROMOTION_NOT_STARTED: 'Cupom ainda não está válido',
-  PROMOTION_EXPIRED: 'Cupom expirado',
-  PROMOTION_USAGE_LIMIT: 'Cupom atingiu o limite de uso',
-  MINIMUM_ORDER_VALUE: 'Valor mínimo do pedido não atingido para este cupom',
-};
 
 export interface CheckoutItemResponse {
   productId: string;
@@ -46,12 +44,13 @@ export interface CheckoutResponse {
     notes: string | null;
     couponCode: string | null;
   };
-  payment: {
-    id: string;
-    method: string;
-    status: PaymentStatus;
-    amount: number;
-  };
+    payment: {
+      id: string;
+      method: string;
+      status: PaymentStatus;
+      amount: number;
+      charge: PaymentChargeView | null;
+    };
 }
 
 interface ValidatedCartItem {
@@ -72,6 +71,8 @@ export class CheckoutService {
     private readonly prisma: PrismaService,
     private readonly cartService: CartService,
     private readonly shippingService: ShippingService,
+    private readonly inventoryService: InventoryService,
+    private readonly paymentsService: PaymentsService,
   ) {}
 
   async checkout(userId: string, dto: CheckoutDto): Promise<CheckoutResponse> {
@@ -146,9 +147,7 @@ export class CheckoutService {
       if (ineligibility) {
         throw new BadRequestException({
           code: ineligibility,
-          message:
-            INELIGIBILITY_MESSAGES[ineligibility] ??
-            'Cupom inválido. Remova o cupom para continuar.',
+          message: getIneligibilityMessage(ineligibility),
         });
       }
 
@@ -168,26 +167,7 @@ export class CheckoutService {
 
     const result = await this.prisma.$transaction(
       async (tx) => {
-        for (const item of validatedItems) {
-          // UPDATE condicional: só reserva se houver saldo disponível no momento
-          // da escrita, impedindo overselling sob concorrência.
-          const reserved = await tx.$executeRaw`
-            UPDATE "inventory"
-            SET "reserved_quantity" = "reserved_quantity" + ${item.quantity}
-            WHERE "product_id" = ${item.productId}::uuid
-              AND ("quantity" - "reserved_quantity") >= ${item.quantity}
-          `;
-
-          if (reserved === 0) {
-            throw new ConflictException({
-              code: 'OUT_OF_STOCK',
-              message: `Produto "${item.name}" sem estoque disponível`,
-              details: [
-                { field: 'items', message: `${item.name} (SKU ${item.sku}) sem estoque` },
-              ],
-            });
-          }
-        }
+        await this.inventoryService.reserveItems(tx, validatedItems);
 
         const order = await tx.order.create({
           data: {
@@ -219,7 +199,7 @@ export class CheckoutService {
                 estimatedDays: shippingConfig.estimatedDays,
               },
             },
-            payment: {
+            payments: {
               create: {
                 method: dto.paymentMethod,
                 status: 'PENDING',
@@ -229,7 +209,7 @@ export class CheckoutService {
           },
           include: {
             items: true,
-            payment: true,
+            payments: true,
           },
         });
 
@@ -250,9 +230,12 @@ export class CheckoutService {
         }
 
         await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
+        // userId é nulificado: a constraint unique em carts.user_id permite
+        // apenas uma linha por usuário. Sem isso, o usuário ficaria
+        // impossibilitado de criar um novo carrinho após o primeiro pedido.
         await tx.cart.update({
           where: { id: cart.id },
-          data: { status: 'CONVERTED', couponId: null },
+          data: { status: 'CONVERTED', couponId: null, userId: null },
         });
 
         return order;
@@ -264,7 +247,7 @@ export class CheckoutService {
       `Order ${result.orderNumber} created for user ${userId} (total ${total.toNumber()})`,
     );
 
-    const createdPayment = result.payment;
+    const createdPayment = result.payments[0];
 
     if (!createdPayment) {
       throw new ConflictException({
@@ -272,6 +255,13 @@ export class CheckoutService {
         message: 'Falha ao registrar o pagamento do pedido',
       });
     }
+
+    // Cobrança no gateway (Pix) após a transação do pedido. Falha aqui não
+    // invalida o pedido: o cliente pode gerar nova cobrança via retry.
+    const charge = await this.paymentsService.createInitialCharge(
+      createdPayment,
+      { id: result.id, orderNumber: result.orderNumber },
+    );
 
     return {
       order: {
@@ -300,6 +290,14 @@ export class CheckoutService {
         method: createdPayment.method,
         status: createdPayment.status,
         amount: createdPayment.amount.toNumber(),
+        charge: charge
+          ? {
+              provider: charge.provider,
+              transactionId: charge.transactionId,
+              qrCode: charge.qrCode,
+              expiresAt: charge.expiresAt,
+            }
+          : null,
       },
     };
   }

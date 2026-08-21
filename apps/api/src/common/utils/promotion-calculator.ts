@@ -21,6 +21,18 @@ export type PromotionIneligibilityCode =
   | 'PROMOTION_USAGE_LIMIT'
   | 'MINIMUM_ORDER_VALUE';
 
+export const INELIGIBILITY_MESSAGES: Record<PromotionIneligibilityCode, string> = {
+  PROMOTION_INACTIVE: 'Cupom inativo',
+  PROMOTION_NOT_STARTED: 'Cupom ainda não está válido',
+  PROMOTION_EXPIRED: 'Cupom expirado',
+  PROMOTION_USAGE_LIMIT: 'Cupom atingiu o limite de uso',
+  MINIMUM_ORDER_VALUE: 'Valor mínimo do pedido não atingido para este cupom',
+};
+
+export function getIneligibilityMessage(code: PromotionIneligibilityCode): string {
+  return INELIGIBILITY_MESSAGES[code];
+}
+
 export interface PromotionApplication {
   code: string;
   name: string;

@@ -21,6 +21,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     let message = 'Erro interno do servidor';
     let code = 'INTERNAL_ERROR';
     let details: Array<{ field: string; message: string }> | undefined;
+    let hasCustomCode = false;
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
@@ -35,6 +36,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
         if (typeof res.code === 'string' && res.code.length > 0) {
           code = res.code;
+          hasCustomCode = true;
         }
 
         if (Array.isArray(res.message)) {
@@ -46,24 +48,28 @@ export class AllExceptionsFilter implements ExceptionFilter {
         }
       }
 
-      switch (status) {
-        case 400:
-          code = 'VALIDATION_ERROR';
-          break;
-        case 401:
-          code = 'AUTHENTICATION_ERROR';
-          break;
-        case 403:
-          code = 'AUTHORIZATION_ERROR';
-          break;
-        case 404:
-          code = 'NOT_FOUND';
-          break;
-        case 409:
-          code = 'CONFLICT';
-          break;
-        default:
-          code = 'HTTP_ERROR';
+      // Códigos de negócio customizados (ex.: OUT_OF_STOCK, EMPTY_CART)
+      // têm precedência sobre o mapeamento genérico por status HTTP.
+      if (!hasCustomCode) {
+        switch (status) {
+          case 400:
+            code = 'VALIDATION_ERROR';
+            break;
+          case 401:
+            code = 'AUTHENTICATION_ERROR';
+            break;
+          case 403:
+            code = 'AUTHORIZATION_ERROR';
+            break;
+          case 404:
+            code = 'NOT_FOUND';
+            break;
+          case 409:
+            code = 'CONFLICT';
+            break;
+          default:
+            code = 'HTTP_ERROR';
+        }
       }
     }
 

@@ -287,7 +287,7 @@ model Order {
 
   user            User            @relation(fields: [userId], references: [id])
   items           OrderItem[]
-  payment         Payment?
+  payments        Payment[]
   shipping        Shipping?
   promotionUsages PromotionUsage[]
   reviews         Review[]
@@ -317,7 +317,7 @@ model OrderItem {
 
 model Payment {
   id            String        @id @default(uuid())
-  orderId       String        @unique @map("order_id")
+  orderId       String        @map("order_id")
   method        PaymentMethod
   status        PaymentStatus @default(PENDING)
   transactionId String?       @map("transaction_id")
@@ -329,6 +329,7 @@ model Payment {
 
   order Order @relation(fields: [orderId], references: [id])
 
+  @@index([orderId])
   @@map("payments")
 }
 

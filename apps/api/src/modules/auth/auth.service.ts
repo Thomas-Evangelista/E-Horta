@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../database/prisma.service';
 import * as bcrypt from 'bcrypt';
+import { createHash } from 'crypto';
 import type { RegisterDto, LoginDto } from './auth.validation';
 
 export interface TokenPayload {
@@ -135,7 +136,7 @@ export class AuthService {
       const storedToken = await this.prisma.$queryRaw<{ id: string }[]>`
         SELECT id FROM refresh_tokens
         WHERE user_id = ${user.id}
-        AND token_hash = ${await bcrypt.hash(refreshToken, 4)}
+        AND token_hash = ${this.hashToken(refreshToken)}
         AND expires_at > NOW()
         LIMIT 1
       `;
@@ -192,7 +193,7 @@ export class AuthService {
   }
 
   private async storeRefreshToken(userId: string, refreshToken: string): Promise<void> {
-    const tokenHash = await bcrypt.hash(refreshToken, 4);
+    const tokenHash = this.hashToken(refreshToken);
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
 
@@ -202,6 +203,15 @@ export class AuthService {
       ON CONFLICT (user_id) DO UPDATE
       SET token_hash = ${tokenHash}, expires_at = ${expiresAt}, created_at = NOW()
     `;
+  }
+
+  /**
+   * Hash determinístico (SHA-256) para permitir busca por igualdade no banco.
+   * bcrypt NÃO serve aqui: o salt aleatório faria o mesmo token gerar hashes
+   * diferentes a cada chamada, impossibilitando a comparação.
+   */
+  private hashToken(token: string): string {
+    return createHash('sha256').update(token).digest('hex');
   }
 
   private toUserResponse(user: {
