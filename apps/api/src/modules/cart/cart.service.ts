@@ -2,7 +2,12 @@ import { Injectable, NotFoundException, BadRequestException, Logger } from '@nes
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../database/prisma.service';
-import { Prisma, type CartStatus, type ProductUnit } from '@prisma/client';
+import { Prisma, type CartStatus, type ProductUnit, type PromotionType } from '@prisma/client';
+import {
+  findPromotionIneligibility,
+  applyPromotion,
+  type PromotionIneligibilityCode,
+} from '../../common/utils/promotion-calculator';
 import type { AddItemDto, UpdateItemDto } from './cart.validation';
 
 export type CartOwner =
@@ -27,6 +32,16 @@ export interface CartItemResponse {
   hasEnoughStock: boolean;
 }
 
+export interface CartCouponResponse {
+  code: string;
+  name: string;
+  type: PromotionType;
+  discount: number;
+  freeShipping: boolean;
+  valid: boolean;
+  ineligibilityCode?: PromotionIneligibilityCode;
+}
+
 export interface CartResponse {
   id: string;
   status: CartStatus;
@@ -34,6 +49,8 @@ export interface CartResponse {
   distinctItems: number;
   itemCount: number;
   subtotal: number;
+  discount: number;
+  coupon: CartCouponResponse | null;
 }
 
 @Injectable()
@@ -310,7 +327,7 @@ export class CartService {
     });
   }
 
-  private async resolveActiveCart(owner: CartOwner) {
+  async resolveActiveCart(owner: CartOwner) {
     if (owner.kind === 'user') {
       return this.getOrCreateActiveCart(owner.userId);
     }
@@ -329,6 +346,20 @@ export class CartService {
     });
   }
 
+  async getCartSubtotal(cartId: string): Promise<Prisma.Decimal> {
+    const items = await this.prisma.cartItem.findMany({
+      where: { cartId },
+      select: { quantity: true, product: { select: { price: true } } },
+    });
+
+    return items
+      .reduce(
+        (acc, item) => acc.plus(new Prisma.Decimal(item.product.price).mul(item.quantity)),
+        new Prisma.Decimal(0),
+      )
+      .toDecimalPlaces(2);
+  }
+
   private getAvailableStock(inventory: { quantity: number; reservedQuantity: number } | null): number {
     if (!inventory) {
       return 0;
@@ -342,6 +373,22 @@ export class CartService {
       select: {
         id: true,
         status: true,
+        couponId: true,
+        coupon: {
+          select: {
+            code: true,
+            name: true,
+            type: true,
+            value: true,
+            minimumOrderValue: true,
+            maxDiscount: true,
+            startsAt: true,
+            endsAt: true,
+            usageLimit: true,
+            usageCount: true,
+            isActive: true,
+          },
+        },
         items: {
           orderBy: { createdAt: 'asc' },
           select: {
@@ -396,6 +443,40 @@ export class CartService {
       });
     }
 
+    let coupon: CartCouponResponse | null = null;
+    let discount = new Prisma.Decimal(0);
+
+    if (cart.coupon) {
+      const ineligibilityCode = findPromotionIneligibility(
+        cart.coupon,
+        subtotal,
+        new Date(),
+      );
+      const application = applyPromotion(cart.coupon, subtotal);
+
+      if (ineligibilityCode) {
+        coupon = {
+          code: cart.coupon.code,
+          name: cart.coupon.name,
+          type: cart.coupon.type,
+          discount: 0,
+          freeShipping: false,
+          valid: false,
+          ineligibilityCode,
+        };
+      } else {
+        discount = application.discount;
+        coupon = {
+          code: application.code,
+          name: application.name,
+          type: application.type,
+          discount: application.discount.toNumber(),
+          freeShipping: application.freeShipping,
+          valid: true,
+        };
+      }
+    }
+
     return {
       id: cart.id,
       status: cart.status,
@@ -403,6 +484,8 @@ export class CartService {
       distinctItems: items.length,
       itemCount,
       subtotal: subtotal.toDecimalPlaces(2).toNumber(),
+      discount: discount.toDecimalPlaces(2).toNumber(),
+      coupon,
     };
   }
 }

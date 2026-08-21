@@ -201,14 +201,17 @@ model Inventory {
 model Cart {
   id        String     @id @default(uuid())
   userId    String?    @unique @map("user_id")
+  couponId  String?    @map("coupon_id")
   status    CartStatus @default(ACTIVE)
   createdAt DateTime   @default(now()) @map("created_at")
   updatedAt DateTime   @updatedAt @map("updated_at")
 
   user      User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  coupon    Promotion?  @relation(fields: [couponId], references: [id], onDelete: SetNull)
   items     CartItem[]
 
   @@index([userId])
+  @@index([couponId])
   @@map("carts")
 }
 
@@ -245,6 +248,7 @@ model Promotion {
   updatedAt          DateTime       @updatedAt @map("updated_at")
 
   usages  PromotionUsage[]
+  carts   Cart[]
 
   @@map("promotions")
 }

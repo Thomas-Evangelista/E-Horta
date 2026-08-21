@@ -1,12 +1,13 @@
-import {
+import type {
   ExceptionFilter,
+  ArgumentsHost} from '@nestjs/common';
+import {
   Catch,
-  ArgumentsHost,
   HttpException,
   HttpStatus,
   Logger,
 } from '@nestjs/common';
-import { Response } from 'express';
+import type { Response } from 'express';
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -31,6 +32,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
         const res = exResponse as Record<string, unknown>;
         message = (res.message as string) || message;
         details = res.details as Array<{ field: string; message: string }> | undefined;
+
+        if (typeof res.code === 'string' && res.code.length > 0) {
+          code = res.code;
+        }
 
         if (Array.isArray(res.message)) {
           message = 'Erro de validação';
