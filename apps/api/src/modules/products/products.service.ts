@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
-import { Prisma, type Product } from '@prisma/client';
+import { Prisma, type Product, type ProductUnit } from '@prisma/client';
 
 export interface ProductFilter {
   category?: string;
@@ -279,7 +279,7 @@ export class ProductsService {
           description: data.description,
           shortDescription: data.shortDescription,
           sku: data.sku,
-          unit: (data.unit as any) || 'UN',
+          unit: (data.unit as ProductUnit) || 'UN',
           weight: data.weight,
           price: new Prisma.Decimal(data.price),
           compareAtPrice: data.compareAtPrice
@@ -357,7 +357,7 @@ export class ProductsService {
     if (data.description !== undefined) updateData.description = data.description;
     if (data.shortDescription !== undefined) updateData.shortDescription = data.shortDescription;
     if (data.sku !== undefined) updateData.sku = data.sku;
-    if (data.unit !== undefined) updateData.unit = data.unit as any;
+    if (data.unit !== undefined) updateData.unit = data.unit as ProductUnit;
     if (data.weight !== undefined) updateData.weight = data.weight;
     if (data.price !== undefined) updateData.price = new Prisma.Decimal(data.price);
     if (data.compareAtPrice !== undefined)
@@ -391,6 +391,16 @@ export class ProductsService {
     if (hasOrders > 0) {
       throw new ConflictException(
         'Não é possível excluir um produto que possui pedidos',
+      );
+    }
+
+    const inCarts = await this.prisma.cartItem.count({
+      where: { productId: id },
+    });
+
+    if (inCarts > 0) {
+      throw new ConflictException(
+        'Não é possível excluir um produto que está em carrinhos ativos. Desative-o.',
       );
     }
 

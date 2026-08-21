@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
+import { CartService } from '../cart/cart.service';
 import {
   registerSchema,
   loginSchema,
@@ -22,7 +23,10 @@ import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly cartService: CartService,
+  ) {}
 
   @Public()
   @Post('register')
@@ -31,8 +35,14 @@ export class AuthController {
     @Body(new ZodValidationPipe(registerSchema)) dto: RegisterDto,
   ) {
     const result = await this.authService.register(dto);
+
+    // Carrinho anônimo criado antes do cadastro é mesclado ao carrinho do usuário.
+    const cart = dto.cartToken
+      ? await this.cartService.mergeOnLogin(result.user.id, dto.cartToken)
+      : null;
+
     return {
-      data: result,
+      data: cart ? { ...result, cart } : result,
       meta: {},
       error: null,
     };
@@ -46,8 +56,14 @@ export class AuthController {
     @Body(new ZodValidationPipe(loginSchema)) dto: LoginDto,
   ) {
     const result = await this.authService.login(dto);
+
+    // Carrinho anônimo + carrinho do usuário → merge → carrinho final.
+    const cart = dto.cartToken
+      ? await this.cartService.mergeOnLogin(result.user.id, dto.cartToken)
+      : null;
+
     return {
-      data: result,
+      data: cart ? { ...result, cart } : result,
       meta: {},
       error: null,
     };

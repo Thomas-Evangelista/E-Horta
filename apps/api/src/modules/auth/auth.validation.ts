@@ -17,6 +17,7 @@ export const registerSchema = z
       .string()
       .regex(/^\d{10,11}$/, 'Telefone deve ter 10 ou 11 dígitos')
       .optional(),
+    cartToken: z.string().min(20).max(2048).optional(),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: 'Senhas não conferem',
@@ -26,6 +27,7 @@ export const registerSchema = z
 export const loginSchema = z.object({
   email: z.string().email('E-mail inválido').toLowerCase().trim(),
   password: z.string().min(1, 'Senha é obrigatória'),
+  cartToken: z.string().min(20).max(2048).optional(),
 });
 
 export const forgotPasswordSchema = z.object({

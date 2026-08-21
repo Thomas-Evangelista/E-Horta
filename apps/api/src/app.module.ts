@@ -9,6 +9,7 @@ import { AddressesModule } from './modules/addresses/addresses.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { ProductsModule } from './modules/products/products.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
+import { CartModule } from './modules/cart/cart.module';
 import { configValidation } from './config/config.validation';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
@@ -19,7 +20,7 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
     ConfigModule.forRoot({
       isGlobal: true,
       validate: configValidation,
-      envFilePath: ['.env.local', '.env'],
+      envFilePath: ['.env.local', '.env', '../../.env.local', '../../.env'],
     }),
     DatabaseModule,
     HealthModule,
@@ -29,6 +30,7 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
     CategoriesModule,
     ProductsModule,
     InventoryModule,
+    CartModule,
   ],
   providers: [
     {
