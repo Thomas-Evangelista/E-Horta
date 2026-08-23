@@ -73,8 +73,8 @@ export class CategoriesService {
     data: {
       name?: string;
       slug?: string;
-      description?: string;
-      imageUrl?: string;
+      description?: string | null;
+      imageUrl?: string | null;
       isActive?: boolean;
       sortOrder?: number;
     },

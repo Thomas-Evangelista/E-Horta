@@ -1,4 +1,10 @@
 import { z } from 'zod';
+import { OrderStatus } from '@prisma/client';
+
+export const orderStatusValues = Object.values(OrderStatus) as [
+  OrderStatus,
+  ...OrderStatus[],
+];
 
 export const ordersQuerySchema = z.object({
   page: z.coerce
@@ -26,3 +32,21 @@ export const cancelOrderSchema = z.object({
 });
 
 export type CancelOrderDto = z.infer<typeof cancelOrderSchema>;
+
+export const adminOrdersQuerySchema = ordersQuerySchema.extend({
+  status: z.enum(orderStatusValues, {
+    errorMap: () => ({ message: 'Status de pedido inválido' }),
+  }).optional(),
+  search: z.string().trim().min(1).max(120).optional(),
+});
+
+export type AdminOrdersQueryDto = z.infer<typeof adminOrdersQuerySchema>;
+
+export const updateOrderStatusSchema = z.object({
+  status: z.enum(orderStatusValues, {
+    errorMap: () => ({ message: 'Status de pedido inválido' }),
+  }),
+  reason: z.string().trim().max(500, 'Motivo deve ter no máximo 500 caracteres').optional(),
+});
+
+export type UpdateOrderStatusDto = z.infer<typeof updateOrderStatusSchema>;

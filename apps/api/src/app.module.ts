@@ -15,6 +15,7 @@ import { PromotionsModule } from './modules/promotions/promotions.module';
 import { CheckoutModule } from './modules/checkout/checkout.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { PaymentsModule } from './modules/payments/payments.module';
+import { AdminModule } from './modules/admin/admin.module';
 import { configValidation } from './config/config.validation';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
@@ -41,6 +42,7 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
     CheckoutModule,
     OrdersModule,
     PaymentsModule,
+    AdminModule,
   ],
   providers: [
     {

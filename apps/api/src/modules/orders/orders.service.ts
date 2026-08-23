@@ -1,10 +1,14 @@
-import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { Prisma, type OrderStatus, type PaymentStatus, type ShippingStatus } from '@prisma/client';
 import { InventoryService } from '../inventory/inventory.service';
 import { CartService, type CartResponse } from '../cart/cart.service';
-import { isCustomerCancellable } from '../../common/utils/order-transitions';
-import type { CancelOrderDto } from './orders.validation';
+import {
+  isCustomerCancellable,
+  isValidTransition,
+  getAllowedTransitions,
+} from '../../common/utils/order-transitions';
+import type { CancelOrderDto, UpdateOrderStatusDto } from './orders.validation';
 
 export interface OrderSummary {
   id: string;
@@ -75,11 +79,39 @@ export interface RepeatOrderResult {
   cart: CartResponse;
 }
 
+export interface AdminOrderSummary extends OrderSummary {
+  customer: {
+    id: string;
+    name: string;
+    email: string;
+  };
+}
+
+export interface AdminOrderDetail extends Omit<OrderDetail, 'cancellable'> {
+  customer: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  allowedTransitions: readonly OrderStatus[];
+}
+
 interface LockedOrderRow {
   id: string;
   status: OrderStatus;
   payment_status: PaymentStatus;
 }
+
+/** Mapeia status do pedido para status de entrega (null = não alterar). */
+const SHIPPING_STATUS_BY_ORDER_STATUS: Record<OrderStatus, ShippingStatus | null> = {
+  PENDING_PAYMENT: 'PENDING',
+  PAYMENT_APPROVED: 'PENDING',
+  PREPARING: 'PROCESSING',
+  READY_FOR_DELIVERY: 'PROCESSING',
+  OUT_FOR_DELIVERY: 'SHIPPED',
+  DELIVERED: 'DELIVERED',
+  CANCELLED: null,
+};
 
 @Injectable()
 export class OrdersService {
@@ -387,5 +419,260 @@ export class OrdersService {
       return 0;
     }
     return Math.max(0, inventory.quantity - inventory.reservedQuantity);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Administração (Fase 8)
+  // ---------------------------------------------------------------------------
+
+  async findAllForAdmin(
+    filters: { page?: number; limit?: number; status?: OrderStatus; search?: string } = {},
+  ): Promise<{ orders: AdminOrderSummary[]; meta: { page: number; limit: number; total: number; totalPages: number } }> {
+    const safeLimit = Math.min(Math.max(1, filters.limit ?? 20), 100);
+    const safePage = Math.max(1, filters.page ?? 1);
+
+    const where: Prisma.OrderWhereInput = {};
+
+    if (filters.status) {
+      where.status = filters.status;
+    }
+
+    if (filters.search) {
+      where.OR = [
+        { orderNumber: { contains: filters.search, mode: 'insensitive' } },
+        { user: { name: { contains: filters.search, mode: 'insensitive' } } },
+        { user: { email: { contains: filters.search, mode: 'insensitive' } } },
+      ];
+    }
+
+    const [total, orders] = await this.prisma.$transaction([
+      this.prisma.order.count({ where }),
+      this.prisma.order.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (safePage - 1) * safeLimit,
+        take: safeLimit,
+        select: {
+          id: true,
+          orderNumber: true,
+          status: true,
+          paymentStatus: true,
+          total: true,
+          createdAt: true,
+          items: { select: { quantity: true } },
+          user: { select: { id: true, name: true, email: true } },
+        },
+      }),
+    ]);
+
+    return {
+      orders: orders.map((order) => ({
+        id: order.id,
+        orderNumber: order.orderNumber,
+        status: order.status,
+        paymentStatus: order.paymentStatus,
+        total: order.total.toNumber(),
+        itemCount: order.items.reduce((acc, item) => acc + item.quantity, 0),
+        cancellable: isCustomerCancellable(order.status),
+        customer: order.user,
+        createdAt: order.createdAt,
+      })),
+      meta: {
+        page: safePage,
+        limit: safeLimit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / safeLimit)),
+      },
+    };
+  }
+
+  async findByIdForAdmin(orderId: string): Promise<AdminOrderDetail> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+        items: { orderBy: { id: 'asc' } },
+        shipping: true,
+        payments: { orderBy: { createdAt: 'desc' }, take: 1 },
+        _count: { select: { payments: true } },
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Pedido não encontrado');
+    }
+
+    const toNumber = (value: Prisma.Decimal) => value.toNumber();
+    const latestPayment = order.payments[0] ?? null;
+
+    return {
+      id: order.id,
+      orderNumber: order.orderNumber,
+      status: order.status,
+      paymentStatus: order.paymentStatus,
+      shippingStatus: order.shippingStatus,
+      subtotal: toNumber(order.subtotal),
+      discount: toNumber(order.discount),
+      shippingFee: toNumber(order.shippingFee),
+      total: toNumber(order.total),
+      addressSnapshot: order.addressSnapshot,
+      notes: order.notes,
+      cancelledAt: order.cancelledAt,
+      cancellationReason: order.cancellationReason,
+      createdAt: order.createdAt,
+      customer: order.user,
+      items: order.items.map((item) => ({
+        productId: item.productId,
+        name: item.productNameSnapshot,
+        sku: item.skuSnapshot,
+        unitPrice: toNumber(item.unitPrice),
+        quantity: item.quantity,
+        total: toNumber(item.total),
+      })),
+      shipping: order.shipping
+        ? {
+            method: order.shipping.method,
+            status: order.shipping.status,
+            trackingCode: order.shipping.trackingCode,
+            estimatedDays: order.shipping.estimatedDays,
+          }
+        : null,
+      payment: latestPayment
+        ? {
+            method: latestPayment.method,
+            status: latestPayment.status,
+            amount: toNumber(latestPayment.amount),
+            paidAt: latestPayment.paidAt,
+          }
+        : null,
+      paymentAttempts: order._count.payments,
+      allowedTransitions: getAllowedTransitions(order.status),
+    };
+  }
+
+  /**
+   * Atualização administrativa de status via máquina de estados
+   * (specs/11-pedidos.md). Efeitos colaterais:
+   *
+   * - Cancelamento de pedido não pago: libera reservas e invalida cobranças
+   *   pendentes (mesmo comportamento do cancelamento pelo cliente);
+   * - Cancelamento após pagamento: apenas muda o status — o estorno é
+   *   responsabilidade do fluxo do gateway;
+   * - Sincroniza o status da entrega (shippings) com marcos do pedido
+   *   (PROCESSING / SHIPPED + shippedAt / DELIVERED + deliveredAt).
+   *
+   * Toda transição é registrada em AuditLog.
+   */
+  async updateStatusForAdmin(
+    adminUserId: string,
+    orderId: string,
+    dto: UpdateOrderStatusDto,
+  ): Promise<AdminOrderDetail> {
+    await this.prisma.$transaction(
+      async (tx) => {
+        const rows = await tx.$queryRaw<LockedOrderRow[]>`
+          SELECT "id", "status", "payment_status"
+          FROM "orders"
+          WHERE "id" = ${orderId}::uuid
+          FOR UPDATE
+        `;
+
+        const order = rows[0];
+
+        if (!order) {
+          throw new NotFoundException('Pedido não encontrado');
+        }
+
+        if (order.status === dto.status) {
+          throw new BadRequestException({
+            code: 'ORDER_SAME_STATUS',
+            message: `Pedido já está no status ${dto.status}`,
+          });
+        }
+
+        if (!isValidTransition(order.status, dto.status)) {
+          throw new ConflictException({
+            code: 'ORDER_INVALID_TRANSITION',
+            message: `Transição inválida de ${order.status} para ${dto.status}`,
+            details: getAllowedTransitions(order.status).map((allowed) => ({
+              field: 'status',
+              message: `Transição permitida: ${allowed}`,
+            })),
+          });
+        }
+
+        if (
+          dto.status === 'CANCELLED' &&
+          order.payment_status === 'PENDING'
+        ) {
+          const items = await tx.orderItem.findMany({
+            where: { orderId: order.id },
+            select: {
+              productId: true,
+              productNameSnapshot: true,
+              skuSnapshot: true,
+              quantity: true,
+            },
+          });
+
+          await this.inventoryService.releaseReservations(
+            tx,
+            items.map((item) => ({
+              productId: item.productId,
+              name: item.productNameSnapshot,
+              sku: item.skuSnapshot,
+              quantity: item.quantity,
+            })),
+          );
+
+          await tx.payment.updateMany({
+            where: { orderId: order.id, status: 'PENDING' },
+            data: { status: 'CANCELLED' },
+          });
+        }
+
+        await tx.order.update({
+          where: { id: order.id },
+          data: {
+            status: dto.status,
+            ...(dto.status === 'CANCELLED' && {
+              cancelledAt: new Date(),
+              cancellationReason: dto.reason ?? null,
+            }),
+          },
+        });
+
+        const shippingStatus = SHIPPING_STATUS_BY_ORDER_STATUS[dto.status];
+
+        if (shippingStatus) {
+          await tx.shipping.updateMany({
+            where: { orderId: order.id },
+            data: {
+              status: shippingStatus,
+              ...(dto.status === 'OUT_FOR_DELIVERY' && { shippedAt: new Date() }),
+              ...(dto.status === 'DELIVERED' && { deliveredAt: new Date() }),
+            },
+          });
+        }
+
+        await tx.auditLog.create({
+          data: {
+            userId: adminUserId,
+            action: 'ORDER_STATUS_UPDATED',
+            entity: 'order',
+            entityId: order.id,
+            metadata: {
+              from: order.status,
+              to: dto.status,
+              reason: dto.reason ?? null,
+            },
+          },
+        });
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted },
+    );
+
+    this.logger.log(`Order ${orderId} status updated to ${dto.status} by admin ${adminUserId}`);
+    return this.findByIdForAdmin(orderId);
   }
 }

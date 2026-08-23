@@ -119,6 +119,60 @@ export class ProductsService {
     };
   }
 
+  /**
+   * Listagem administrativa: inclui produtos inativos e permite filtrar
+   * por categoria e status ativo.
+   */
+  async findAllForAdmin(
+    filters: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      categoryId?: string;
+      isActive?: boolean;
+    } = {},
+  ): Promise<PaginatedProducts> {
+    const page = Math.max(1, filters.page ?? 1);
+    const limit = Math.min(Math.max(1, filters.limit ?? 20), 100);
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.ProductWhereInput = {
+      ...(filters.categoryId && { categoryId: filters.categoryId }),
+      ...(filters.isActive !== undefined && { isActive: filters.isActive }),
+      ...(filters.search && {
+        OR: [
+          { name: { contains: filters.search, mode: 'insensitive' } },
+          { sku: { contains: filters.search, mode: 'insensitive' } },
+          { slug: { contains: filters.search, mode: 'insensitive' } },
+        ],
+      }),
+    };
+
+    const [products, total] = await Promise.all([
+      this.prisma.product.findMany({
+        where,
+        include: {
+          category: { select: { id: true, name: true, slug: true } },
+          inventory: { select: { quantity: true, reservedQuantity: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.product.count({ where }),
+    ]);
+
+    return {
+      products,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+      },
+    };
+  }
+
   async findBySlug(slug: string) {
     const product = await this.prisma.product.findUnique({
       where: { slug },
@@ -316,15 +370,15 @@ export class ProductsService {
       categoryId?: string;
       name?: string;
       slug?: string;
-      description?: string;
-      shortDescription?: string;
+      description?: string | null;
+      shortDescription?: string | null;
       sku?: string;
       unit?: string;
-      weight?: number;
+      weight?: number | null;
       price?: number;
       compareAtPrice?: number | null;
       costPrice?: number | null;
-      imageUrl?: string;
+      imageUrl?: string | null;
       isActive?: boolean;
       isFeatured?: boolean;
     },

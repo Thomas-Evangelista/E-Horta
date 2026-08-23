@@ -74,6 +74,7 @@ describe('OrdersService', () => {
     $queryRaw: jest.Mock;
     order: {
       findFirst: jest.Mock;
+      findUnique: jest.Mock;
       findMany: jest.Mock;
       count: jest.Mock;
       update: jest.Mock;
@@ -86,6 +87,8 @@ describe('OrdersService', () => {
       update: jest.Mock;
       create: jest.Mock;
     };
+    shipping: { updateMany: jest.Mock };
+    auditLog: { create: jest.Mock };
   };
   let inventoryService: { releaseReservations: jest.Mock };
   let cartService: {
@@ -111,6 +114,7 @@ describe('OrdersService', () => {
       $queryRaw: jest.fn(),
       order: {
         findFirst: jest.fn(),
+        findUnique: jest.fn(),
         findMany: jest.fn().mockResolvedValue([]),
         count: jest.fn().mockResolvedValue(0),
         update: jest.fn().mockResolvedValue({}),
@@ -123,6 +127,8 @@ describe('OrdersService', () => {
         update: jest.fn().mockResolvedValue({}),
         create: jest.fn().mockResolvedValue({}),
       },
+      shipping: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      auditLog: { create: jest.fn().mockResolvedValue({}) },
     };
 
     inventoryService = {
@@ -509,6 +515,165 @@ describe('OrdersService', () => {
       ).rejects.toBeInstanceOf(NotFoundException);
 
       expect(cartService.resolveActiveCart).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('updateStatusForAdmin', () => {
+    const adminId = 'admin-1';
+
+    beforeEach(() => {
+      // Detalhe retornado após a transação (findByIdForAdmin).
+      prisma.order.findUnique.mockResolvedValue(
+        buildOrderRecord({ status: 'PREPARING' }),
+      );
+    });
+
+    it('deve aplicar transição válida sincronizando entrega e audit log', async () => {
+      prisma.$queryRaw.mockResolvedValue([
+        { id: 'order-1', status: 'PAYMENT_APPROVED', payment_status: 'APPROVED' },
+      ]);
+
+      const result = await service.updateStatusForAdmin(adminId, 'order-1', {
+        status: 'PREPARING',
+        reason: 'Separando itens',
+      });
+
+      expect(prisma.order.update).toHaveBeenCalledWith({
+        where: { id: 'order-1' },
+        data: { status: 'PREPARING' },
+      });
+      expect(prisma.shipping.updateMany).toHaveBeenCalledWith({
+        where: { orderId: 'order-1' },
+        data: { status: 'PROCESSING' },
+      });
+      expect(prisma.auditLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          userId: adminId,
+          action: 'ORDER_STATUS_UPDATED',
+          entityId: 'order-1',
+          metadata: { from: 'PAYMENT_APPROVED', to: 'PREPARING', reason: 'Separando itens' },
+        }),
+      });
+      // Pagamento aprovado: nada reservado para liberar.
+      expect(inventoryService.releaseReservations).not.toHaveBeenCalled();
+      expect(result.status).toBe('PREPARING');
+    });
+
+    it('deve liberar reservas ao cancelar pedido não pago', async () => {
+      prisma.$queryRaw.mockResolvedValue([
+        { id: 'order-1', status: 'PENDING_PAYMENT', payment_status: 'PENDING' },
+      ]);
+      prisma.orderItem.findMany.mockResolvedValue([
+        {
+          productId: 'product-1',
+          productNameSnapshot: 'Alface Crespa',
+          skuSnapshot: 'ALF-001',
+          quantity: 2,
+        },
+      ]);
+
+      await service.updateStatusForAdmin(adminId, 'order-1', { status: 'CANCELLED' });
+
+      expect(inventoryService.releaseReservations).toHaveBeenCalledWith(
+        expect.anything(),
+        [
+          {
+            productId: 'product-1',
+            name: 'Alface Crespa',
+            sku: 'ALF-001',
+            quantity: 2,
+          },
+        ],
+      );
+      expect(prisma.payment.updateMany).toHaveBeenCalledWith({
+        where: { orderId: 'order-1', status: 'PENDING' },
+        data: { status: 'CANCELLED' },
+      });
+      expect(prisma.order.update).toHaveBeenCalledWith({
+        where: { id: 'order-1' },
+        data: expect.objectContaining({ status: 'CANCELLED', cancelledAt: expect.any(Date) }),
+      });
+    });
+
+    it('não deve tocar no estoque ao cancelar pedido já pago', async () => {
+      prisma.$queryRaw.mockResolvedValue([
+        { id: 'order-1', status: 'PAYMENT_APPROVED', payment_status: 'APPROVED' },
+      ]);
+
+      await service.updateStatusForAdmin(adminId, 'order-1', {
+        status: 'CANCELLED',
+        reason: 'Cliente solicitou',
+      });
+
+      expect(inventoryService.releaseReservations).not.toHaveBeenCalled();
+      expect(prisma.payment.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('deve registrar envio na saída para entrega e data de entrega ao finalizar', async () => {
+      prisma.$queryRaw.mockResolvedValue([
+        { id: 'order-1', status: 'OUT_FOR_DELIVERY', payment_status: 'APPROVED' },
+      ]);
+
+      await service.updateStatusForAdmin(adminId, 'order-1', { status: 'DELIVERED' });
+
+      expect(prisma.shipping.updateMany).toHaveBeenCalledWith({
+        where: { orderId: 'order-1' },
+        data: expect.objectContaining({ status: 'DELIVERED', deliveredAt: expect.any(Date) }),
+      });
+    });
+
+    it('deve rejeitar transição inválida com as opções permitidas', async () => {
+      prisma.$queryRaw.mockResolvedValue([
+        { id: 'order-1', status: 'DELIVERED', payment_status: 'APPROVED' },
+      ]);
+
+      await expect(
+        service.updateStatusForAdmin(adminId, 'order-1', { status: 'PREPARING' }),
+      ).rejects.toMatchObject({
+        response: {
+          code: 'ORDER_INVALID_TRANSITION',
+          details: [],
+        },
+      });
+
+      expect(prisma.order.update).not.toHaveBeenCalled();
+      expect(prisma.auditLog.create).not.toHaveBeenCalled();
+    });
+
+    it('deve rejeitar quando o pedido já está no status informado', async () => {
+      prisma.$queryRaw.mockResolvedValue([
+        { id: 'order-1', status: 'PREPARING', payment_status: 'APPROVED' },
+      ]);
+
+      await expect(
+        service.updateStatusForAdmin(adminId, 'order-1', { status: 'PREPARING' }),
+      ).rejects.toMatchObject({ response: { code: 'ORDER_SAME_STATUS' } });
+    });
+
+    it('deve lançar NotFound para pedido inexistente', async () => {
+      prisma.$queryRaw.mockResolvedValue([]);
+
+      await expect(
+        service.updateStatusForAdmin(adminId, 'order-1', { status: 'PREPARING' }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('deve expor transições permitidas e cliente no detalhe administrativo', async () => {
+      prisma.order.findUnique.mockResolvedValue(
+        buildOrderRecord({
+          status: 'PENDING_PAYMENT',
+          user: { id: 'user-1', name: 'Maria', email: 'maria@example.com' },
+        }),
+      );
+
+      const result = await service.findByIdForAdmin('order-1');
+
+      expect(result.allowedTransitions).toEqual(['PAYMENT_APPROVED', 'CANCELLED']);
+      expect(result.customer).toEqual({
+        id: 'user-1',
+        name: 'Maria',
+        email: 'maria@example.com',
+      });
     });
   });
 });
