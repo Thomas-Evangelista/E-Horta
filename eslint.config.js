@@ -12,6 +12,7 @@ module.exports = [
       '**/coverage/**',
       '**/.next/**',
       '**/out/**',
+      '**/next-env.d.ts',
     ],
   },
   {

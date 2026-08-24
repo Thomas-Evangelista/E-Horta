@@ -1,0 +1,62 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
+    Arial, sans-serif;
+
+  --color-cream-50: #faf8f2;
+  --color-cream-100: #f5f1e6;
+  --color-cream-200: #ece5d2;
+  --color-cream-300: #ddd5bd;
+
+  --color-accent-50: #fdf3e7;
+  --color-accent-100: #fbe4cc;
+  --color-accent-200: #f6c69a;
+  --color-accent-400: #ef9c53;
+  --color-accent-500: #e8862e;
+  --color-accent-600: #d0731f;
+  --color-accent-700: #ad5d17;
+
+  --color-leaf-50: #eef6ea;
+  --color-leaf-100: #dcedd3;
+  --color-leaf-500: #6aa253;
+  --color-leaf-600: #4c8c3f;
+  --color-leaf-700: #3b7031;
+
+  --color-ink-400: #9a938a;
+  --color-ink-500: #6f6860;
+  --color-ink-600: #4a453f;
+  --color-ink-800: #292520;
+  --color-ink-900: #1c1915;
+
+  --radius-card: 1rem;
+  --radius-pill: 999px;
+
+  --shadow-card: 0 1px 3px rgb(41 37 32 / 0.06), 0 4px 14px rgb(41 37 32 / 0.05);
+  --shadow-nav: 0 -4px 16px rgb(41 37 32 / 0.08);
+
+  --z-header: 40;
+  --z-nav: 50;
+  --z-toast: 100;
+}
+
+body {
+  @apply bg-cream-50 text-ink-800 font-sans antialiased;
+}
+
+*:focus-visible {
+  outline: 2px solid var(--color-accent-500);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
