@@ -1,6 +1,7 @@
 import { Module, type Provider } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InventoryModule } from '../inventory/inventory.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { PAYMENT_PROVIDER } from './payment-provider.interface';
 import { SandboxPixProvider } from './providers/sandbox-pix.provider';
 import { PaymentsController } from './payments.controller';
@@ -25,7 +26,7 @@ const paymentProviderFactory: Provider = {
 };
 
 @Module({
-  imports: [InventoryModule],
+  imports: [InventoryModule, NotificationsModule],
   controllers: [PaymentsController, WebhooksController],
   providers: [paymentProviderFactory, PaymentsService],
   exports: [PaymentsService],

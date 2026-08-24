@@ -19,6 +19,7 @@ import {
   getIneligibilityMessage,
 } from '../../common/utils/promotion-calculator';
 import type { CheckoutDto } from './checkout.validation';
+import { NotificationsService } from '../notifications/notifications.service';
 
 export interface CheckoutItemResponse {
   productId: string;
@@ -73,6 +74,7 @@ export class CheckoutService {
     private readonly shippingService: ShippingService,
     private readonly inventoryService: InventoryService,
     private readonly paymentsService: PaymentsService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async checkout(userId: string, dto: CheckoutDto): Promise<CheckoutResponse> {
@@ -246,6 +248,12 @@ export class CheckoutService {
     this.logger.log(
       `Order ${result.orderNumber} created for user ${userId} (total ${total.toNumber()})`,
     );
+
+    this.notificationsService.notify(userId, 'ORDER_CREATED', {
+      orderNumber: result.orderNumber,
+      orderId: result.id,
+      total: total.toNumber(),
+    });
 
     const createdPayment = result.payments[0];
 

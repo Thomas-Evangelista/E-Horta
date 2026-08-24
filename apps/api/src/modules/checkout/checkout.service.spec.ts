@@ -6,6 +6,7 @@ import { CartService } from '../cart/cart.service';
 import { ShippingService } from '../shipping/shipping.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { PaymentsService } from '../payments/payments.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../../database/prisma.service';
 
 describe('CheckoutService', () => {
@@ -25,6 +26,7 @@ describe('CheckoutService', () => {
   let shippingService: { getMethodConfig: jest.Mock };
   let inventoryService: { reserveItems: jest.Mock; releaseReservations: jest.Mock };
   let paymentsService: { createInitialCharge: jest.Mock };
+  let notificationsService: { notify: jest.Mock };
 
   const userId = 'user-1';
   const addressId = '0b8f6c1a-1111-4222-8333-444455556666';
@@ -147,6 +149,10 @@ describe('CheckoutService', () => {
       createInitialCharge: jest.fn().mockResolvedValue(null),
     };
 
+    notificationsService = {
+      notify: jest.fn(),
+    };
+
     const moduleRef = await Test.createTestingModule({
       providers: [
         CheckoutService,
@@ -155,6 +161,7 @@ describe('CheckoutService', () => {
         { provide: ShippingService, useValue: shippingService },
         { provide: InventoryService, useValue: inventoryService },
         { provide: PaymentsService, useValue: paymentsService },
+        { provide: NotificationsService, useValue: notificationsService },
       ],
     }).compile();
 

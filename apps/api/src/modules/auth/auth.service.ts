@@ -5,6 +5,7 @@ import { PrismaService } from '../../database/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { createHash } from 'crypto';
 import type { RegisterDto, LoginDto } from './auth.validation';
+import { NotificationsService } from '../notifications/notifications.service';
 
 export interface TokenPayload {
   sub: string;
@@ -35,6 +36,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async register(dto: RegisterDto): Promise<{ user: UserResponse; tokens: AuthTokens }> {
@@ -75,6 +77,10 @@ export class AuthService {
     });
 
     await this.storeRefreshToken(user.id, tokens.refreshToken);
+
+    this.notificationsService.notify(user.id, 'ACCOUNT_CREATED', {
+      userName: user.name,
+    });
 
     this.logger.log(`User registered: ${user.email}`);
 

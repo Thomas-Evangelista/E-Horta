@@ -13,6 +13,8 @@ import { UsersModule } from '../users/users.module';
 import { InventoryModule } from '../inventory/inventory.module';
 import { OrdersModule } from '../orders/orders.module';
 import { PromotionsModule } from '../promotions/promotions.module';
+import { ReviewsModule } from '../reviews/reviews.module';
+import { AdminReviewsController } from './admin-reviews.controller';
 
 @Module({
   imports: [
@@ -22,6 +24,7 @@ import { PromotionsModule } from '../promotions/promotions.module';
     InventoryModule,
     OrdersModule,
     PromotionsModule,
+    ReviewsModule,
   ],
   controllers: [
     AdminDashboardController,
@@ -31,6 +34,7 @@ import { PromotionsModule } from '../promotions/promotions.module';
     AdminCategoriesController,
     AdminInventoryController,
     AdminPromotionsController,
+    AdminReviewsController,
   ],
   providers: [AdminService],
 })

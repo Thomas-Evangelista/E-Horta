@@ -22,6 +22,7 @@ import {
   type WebhookEventType,
   type WebhookPayload,
 } from './payments.validation';
+import { NotificationsService } from '../notifications/notifications.service';
 
 const WEBHOOK_SIGNATURE_HEADER = 'x-webhook-signature';
 
@@ -70,6 +71,7 @@ export class PaymentsService {
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
     private readonly inventoryService: InventoryService,
+    private readonly notificationsService: NotificationsService,
     @Inject(PAYMENT_PROVIDER) private readonly paymentProvider: PaymentProvider,
   ) {}
 
@@ -223,6 +225,9 @@ export class PaymentsService {
     eventType: WebhookEventType,
     payload: WebhookPayload,
   ): Promise<WebhookProcessResult> {
+    // Capturado dentro da transação para notificar após o commit.
+    let appliedOrderId: string | null = null;
+
     const result = await this.prisma.$transaction(
       async (tx) => {
         // Registro do evento primeiro: unique(provider, eventId) bloqueia
@@ -289,6 +294,7 @@ export class PaymentsService {
         }));
 
         if (eventType === 'payment.approved') {
+          appliedOrderId = payment.order_id;
           await tx.payment.update({
             where: { id: payment.id },
             data: {
@@ -318,6 +324,7 @@ export class PaymentsService {
 
         // payment.failed: libera reserva; pedido permanece PENDING_PAYMENT
         // para permitir nova tentativa sem criar outro pedido (spec #69).
+        appliedOrderId = payment.order_id;
         await tx.payment.update({
           where: { id: payment.id },
           data: {
@@ -351,7 +358,40 @@ export class PaymentsService {
       return { received: true, duplicate: false, applied: false, reason: result.ignored };
     }
 
+    // Notifica o cliente fora da transação (spec #16): aprovação ou falha.
+    if (appliedOrderId) {
+      await this.notifyPaymentOutcome(appliedOrderId, result.orderStatus);
+    }
+
     return { received: true, duplicate: false, ...result };
+  }
+
+  private async notifyPaymentOutcome(
+    orderId: string,
+    orderStatus: OrderStatus | undefined,
+  ): Promise<void> {
+    if (orderStatus !== 'PAYMENT_APPROVED' && orderStatus !== 'PENDING_PAYMENT') {
+      return;
+    }
+
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { userId: true, orderNumber: true, total: true },
+    });
+
+    if (!order) {
+      return;
+    }
+
+    this.notificationsService.notify(
+      order.userId,
+      orderStatus === 'PAYMENT_APPROVED' ? 'PAYMENT_APPROVED' : 'PAYMENT_FAILED',
+      {
+        orderId,
+        orderNumber: order.orderNumber,
+        total: order.total.toNumber(),
+      },
+    );
   }
 
   /**

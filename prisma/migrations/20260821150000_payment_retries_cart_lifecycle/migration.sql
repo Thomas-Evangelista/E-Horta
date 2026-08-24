@@ -1,6 +1,8 @@
 -- Um pedido pode ter múltiplas tentativas de pagamento
 -- (ex.: Pix expirado/cartão recusado → nova cobrança sobre o mesmo pedido).
-ALTER TABLE "payments" DROP CONSTRAINT "payments_order_id_key";
+-- O init cria order_id como índice único (CREATE UNIQUE INDEX), não como
+-- constraint; DROP CONSTRAINT falharia em um banco novo.
+DROP INDEX IF EXISTS "payments_order_id_key";
 CREATE INDEX "payments_order_id_idx" ON "payments"("order_id");
 
 -- Reparo de dados: carrinhos encerrados (CONVERTED/ABANDONED) não podem

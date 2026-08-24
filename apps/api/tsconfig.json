@@ -2,6 +2,7 @@
   "extends": "../../packages/tsconfig/nest.json",
   "compilerOptions": {
     "baseUrl": ".",
+    "outDir": "./dist",
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "paths": {

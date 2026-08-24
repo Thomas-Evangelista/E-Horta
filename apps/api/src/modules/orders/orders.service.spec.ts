@@ -7,6 +7,7 @@ import { Prisma } from '@prisma/client';
 import { OrdersService } from './orders.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { CartService } from '../cart/cart.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../../database/prisma.service';
 
 const decimal = (value: string) => new Prisma.Decimal(value);
@@ -95,6 +96,7 @@ describe('OrdersService', () => {
     resolveActiveCart: jest.Mock;
     getCart: jest.Mock;
   };
+  let notificationsService: { notify: jest.Mock };
 
   const activeCart = { id: 'cart-1', userId: 'user-1', status: 'ACTIVE' };
   const emptyCartResponse = {
@@ -140,12 +142,17 @@ describe('OrdersService', () => {
       getCart: jest.fn().mockResolvedValue(emptyCartResponse),
     };
 
+    notificationsService = {
+      notify: jest.fn(),
+    };
+
     const moduleRef = await Test.createTestingModule({
       providers: [
         OrdersService,
         { provide: PrismaService, useValue: prisma },
         { provide: InventoryService, useValue: inventoryService },
         { provide: CartService, useValue: cartService },
+        { provide: NotificationsService, useValue: notificationsService },
       ],
     }).compile();
 

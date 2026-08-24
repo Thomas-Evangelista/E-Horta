@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, ConflictException, BadRequestException, 
 import { PrismaService } from '../../database/prisma.service';
 import { Prisma, type OrderStatus, type PaymentStatus, type ShippingStatus } from '@prisma/client';
 import { InventoryService } from '../inventory/inventory.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CartService, type CartResponse } from '../cart/cart.service';
 import {
   isCustomerCancellable,
@@ -121,6 +122,7 @@ export class OrdersService {
     private readonly prisma: PrismaService,
     private readonly inventoryService: InventoryService,
     private readonly cartService: CartService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async findAllByUser(
@@ -568,6 +570,10 @@ export class OrdersService {
     orderId: string,
     dto: UpdateOrderStatusDto,
   ): Promise<AdminOrderDetail> {
+    // Capturados dentro da transação para notificar após o commit.
+    let updatedUserId = '';
+    let updatedOrderNumber = '';
+
     await this.prisma.$transaction(
       async (tx) => {
         const rows = await tx.$queryRaw<LockedOrderRow[]>`
@@ -631,7 +637,7 @@ export class OrdersService {
           });
         }
 
-        await tx.order.update({
+        const updatedOrder = await tx.order.update({
           where: { id: order.id },
           data: {
             status: dto.status,
@@ -641,6 +647,8 @@ export class OrdersService {
             }),
           },
         });
+        updatedUserId = updatedOrder.userId;
+        updatedOrderNumber = updatedOrder.orderNumber;
 
         const shippingStatus = SHIPPING_STATUS_BY_ORDER_STATUS[dto.status];
 
@@ -673,6 +681,23 @@ export class OrdersService {
     );
 
     this.logger.log(`Order ${orderId} status updated to ${dto.status} by admin ${adminUserId}`);
+
+    // Notifica o cliente sobre marcos do pedido (spec #16). Aprovação de
+    // pagamento é notificada pelo webhook; cancelamento não tem template.
+    const statusEvents: Partial<Record<OrderStatus, Parameters<NotificationsService['notify']>[1]>> = {
+      PREPARING: 'ORDER_PREPARING',
+      OUT_FOR_DELIVERY: 'ORDER_OUT_FOR_DELIVERY',
+      DELIVERED: 'ORDER_DELIVERED',
+    };
+
+    const notificationEvent = statusEvents[dto.status];
+    if (notificationEvent) {
+      this.notificationsService.notify(updatedUserId, notificationEvent, {
+        orderId,
+        orderNumber: updatedOrderNumber,
+      });
+    }
+
     return this.findByIdForAdmin(orderId);
   }
 }

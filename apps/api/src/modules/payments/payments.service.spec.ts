@@ -10,6 +10,7 @@ import { createHmac } from 'crypto';
 import { Prisma } from '@prisma/client';
 import { PaymentsService } from './payments.service';
 import { InventoryService } from '../inventory/inventory.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PAYMENT_PROVIDER, type PaymentProvider } from './payment-provider.interface';
 import { PrismaService } from '../../database/prisma.service';
 
@@ -35,11 +36,12 @@ describe('PaymentsService', () => {
     $queryRaw: jest.Mock;
     orderItem: { findMany: jest.Mock };
     payment: { update: jest.Mock; findUnique: jest.Mock; create: jest.Mock };
-    order: { update: jest.Mock; findFirst: jest.Mock };
+    order: { update: jest.Mock; findFirst: jest.Mock; findUnique: jest.Mock };
     _count?: unknown;
     $transaction: jest.Mock;
   };
   let inventoryService: { confirmReductions: jest.Mock; releaseReservations: jest.Mock };
+  let notificationsService: { notify: jest.Mock };
   let provider: PaymentProvider;
 
   const lockedPaymentRow = {
@@ -69,13 +71,17 @@ describe('PaymentsService', () => {
       $queryRaw: jest.fn().mockResolvedValue([lockedPaymentRow]),
       orderItem: { findMany: jest.fn().mockResolvedValue(orderItems) },
       payment: { update: jest.fn().mockResolvedValue({}), findUnique: jest.fn(), create: jest.fn() },
-      order: { update: jest.fn().mockResolvedValue({}), findFirst: jest.fn() },
+      order: { update: jest.fn().mockResolvedValue({}), findFirst: jest.fn(), findUnique: jest.fn() },
       $transaction: jest.fn(),
     };
 
     inventoryService = {
       confirmReductions: jest.fn().mockResolvedValue(undefined),
       releaseReservations: jest.fn().mockResolvedValue(undefined),
+    };
+
+    notificationsService = {
+      notify: jest.fn(),
     };
 
     provider = {
@@ -103,6 +109,7 @@ describe('PaymentsService', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: ConfigService, useValue: configService },
         { provide: InventoryService, useValue: inventoryService },
+        { provide: NotificationsService, useValue: notificationsService },
         { provide: PAYMENT_PROVIDER, useValue: provider },
       ],
     }).compile();
@@ -133,6 +140,7 @@ describe('PaymentsService', () => {
             useValue: { get: jest.fn().mockReturnValue(undefined) },
           },
           { provide: InventoryService, useValue: inventoryService },
+          { provide: NotificationsService, useValue: notificationsService },
           { provide: PAYMENT_PROVIDER, useValue: provider },
         ],
       }).compile();
