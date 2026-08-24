@@ -182,8 +182,13 @@ export class ProductsService {
         productImages: { orderBy: { sortOrder: 'asc' } },
         reviews: {
           where: { status: 'APPROVED' },
-          select: { id: true, rating: true, comment: true, createdAt: true },
-          include: { user: { select: { id: true, name: true } } },
+          select: {
+            id: true,
+            rating: true,
+            comment: true,
+            createdAt: true,
+            user: { select: { id: true, name: true } },
+          },
           orderBy: { createdAt: 'desc' },
           take: 10,
         },

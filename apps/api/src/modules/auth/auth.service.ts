@@ -141,7 +141,7 @@ export class AuthService {
 
       const storedToken = await this.prisma.$queryRaw<{ id: string }[]>`
         SELECT id FROM refresh_tokens
-        WHERE user_id = ${user.id}
+        WHERE user_id = ${user.id}::uuid
         AND token_hash = ${this.hashToken(refreshToken)}
         AND expires_at > NOW()
         LIMIT 1
@@ -167,7 +167,7 @@ export class AuthService {
 
   async logout(userId: string): Promise<void> {
     await this.prisma.$executeRaw`
-      DELETE FROM refresh_tokens WHERE user_id = ${userId}
+      DELETE FROM refresh_tokens WHERE user_id = ${userId}::uuid
     `;
     this.logger.log(`User logged out: ${userId}`);
   }
@@ -205,7 +205,7 @@ export class AuthService {
 
     await this.prisma.$executeRaw`
       INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at, created_at)
-      VALUES (gen_random_uuid()::text, ${userId}, ${tokenHash}, ${expiresAt}, NOW())
+      VALUES (gen_random_uuid(), ${userId}::uuid, ${tokenHash}, ${expiresAt}, NOW())
       ON CONFLICT (user_id) DO UPDATE
       SET token_hash = ${tokenHash}, expires_at = ${expiresAt}, created_at = NOW()
     `;
