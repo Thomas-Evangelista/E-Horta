@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { ProductCard } from './product-card';
 import type { Product } from '@/types/api';
@@ -10,14 +10,40 @@ interface ProductCarouselProps {
   products: Product[];
 }
 
+const SCROLL_STEP = 280;
+
 export function ProductCarousel({ title, products }: ProductCarouselProps) {
   const trackRef = useRef<HTMLUListElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const updateScrollState = useCallback(() => {
+    const track = trackRef.current;
+    if (!track) return;
+    const maxScroll = track.scrollWidth - track.clientWidth;
+    setCanScrollLeft(track.scrollLeft > 4);
+    setCanScrollRight(track.scrollLeft < maxScroll - 4);
+  }, []);
+
+  useEffect(() => {
+    updateScrollState();
+    const track = trackRef.current;
+    if (!track) return;
+    track.addEventListener('scroll', updateScrollState, { passive: true });
+    window.addEventListener('resize', updateScrollState);
+    return () => {
+      track.removeEventListener('scroll', updateScrollState);
+      window.removeEventListener('resize', updateScrollState);
+    };
+  }, [updateScrollState]);
 
   function scroll(direction: -1 | 1) {
-    trackRef.current?.scrollBy({ left: direction * 280, behavior: 'smooth' });
+    trackRef.current?.scrollBy({ left: direction * SCROLL_STEP, behavior: 'smooth' });
   }
 
   if (products.length === 0) return null;
+
+  const arrowClass = `flex h-9 w-9 items-center justify-center rounded-full border border-cream-300 bg-white text-ink-600 transition-colors hover:bg-cream-50 disabled:cursor-not-allowed disabled:opacity-35`;
 
   return (
     <section aria-labelledby={`carousel-${title}`}>
@@ -29,16 +55,18 @@ export function ProductCarousel({ title, products }: ProductCarouselProps) {
           <button
             type="button"
             aria-label={`Rolar ${title} para a esquerda`}
+            disabled={!canScrollLeft}
             onClick={() => scroll(-1)}
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-cream-300 bg-white text-ink-600 hover:bg-cream-50"
+            className={arrowClass}
           >
             <ChevronLeft size={18} aria-hidden />
           </button>
           <button
             type="button"
             aria-label={`Rolar ${title} para a direita`}
+            disabled={!canScrollRight}
             onClick={() => scroll(1)}
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-cream-300 bg-white text-ink-600 hover:bg-cream-50"
+            className={arrowClass}
           >
             <ChevronRight size={18} aria-hidden />
           </button>

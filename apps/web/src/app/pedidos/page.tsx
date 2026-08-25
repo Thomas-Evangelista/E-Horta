@@ -10,16 +10,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { apiRequest } from '@/lib/api-client';
 import { friendlyMessage } from '@/lib/errors';
 import { formatDate, formatPrice } from '@/lib/format';
+import { orderStatusLabel } from '@/lib/order-status';
 import { useSessionStore } from '@/stores/session';
-
-const STATUS_LABELS: Record<string, string> = {
-  PENDING: 'Aguardando pagamento',
-  PAYMENT_APPROVED: 'Pago',
-  PREPARING: 'Em preparo',
-  OUT_FOR_DELIVERY: 'Em rota',
-  DELIVERED: 'Entregue',
-  CANCELLED: 'Cancelado',
-};
 
 interface OrderSummaryView {
   id: string;
@@ -129,7 +121,7 @@ export default function PedidosPage() {
               transition={{ delay: Math.min(index * 0.04, 0.3) }}
             >
               <Link
-                href="/pedidos"
+                href={`/pedidos/${order.id}`}
                 className="flex items-center gap-3 rounded-card border border-cream-200 bg-white p-4 shadow-card transition-colors hover:border-accent-200"
               >
                 <span
@@ -155,7 +147,7 @@ export default function PedidosPage() {
                           : 'bg-accent-50 text-accent-700'
                     }`}
                   >
-                    {STATUS_LABELS[order.status] ?? order.status}
+                    {orderStatusLabel(order.status)}
                   </span>
                 </span>
                 <span className="shrink-0 text-sm font-extrabold text-accent-600">

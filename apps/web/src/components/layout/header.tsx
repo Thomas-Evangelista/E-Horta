@@ -2,11 +2,13 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { Search, ShoppingCart } from 'lucide-react';
+import { Bell, Search, ShoppingCart } from 'lucide-react';
 import { Container } from './container';
 import { useCart } from '@/hooks/use-cart';
+import { useUnreadNotificationsCount } from '@/hooks/use-notifications';
+import { useSessionStore } from '@/stores/session';
 
 function CartBadge() {
   const { data: cart } = useCart();
@@ -31,6 +33,44 @@ function CartBadge() {
         className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent-500 px-1 text-[11px] font-bold text-white"
       >
         {count}
+      </motion.span>
+    </Link>
+  );
+}
+
+function NotificationsBadge() {
+  const user = useSessionStore((state) => state.user);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    setHydrated(useSessionStore.persist.hasHydrated());
+    return useSessionStore.persist.onFinishHydration(() => setHydrated(true));
+  }, []);
+
+  const { data: unread } = useUnreadNotificationsCount(hydrated && Boolean(user));
+  const count = user ? (unread ?? 0) : 0;
+  const reduceMotion = useReducedMotion();
+
+  return (
+    <Link
+      href="/notificacoes"
+      aria-label={
+        count > 0
+          ? `Notificações, ${count} não ${count === 1 ? 'lida' : 'lidas'}`
+          : 'Notificações'
+      }
+      className="relative flex h-10 w-10 items-center justify-center rounded-full hover:bg-cream-100"
+    >
+      <Bell size={20} aria-hidden className="text-ink-600" />
+      <motion.span
+        key={count}
+        initial={reduceMotion ? false : { scale: 0.4 }}
+        animate={count > 0 ? { scale: 1 } : { scale: 0 }}
+        transition={{ type: 'spring', stiffness: 500, damping: 22 }}
+        aria-hidden
+        className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent-500 px-1 text-[11px] font-bold text-white"
+      >
+        {count > 9 ? '9+' : count}
       </motion.span>
     </Link>
   );
@@ -84,6 +124,7 @@ export function Header() {
             </button>
           </form>
 
+          <NotificationsBadge />
           <CartBadge />
         </div>
       </Container>

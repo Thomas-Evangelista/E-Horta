@@ -1,43 +1,38 @@
-'use client';
+import type { Metadata } from 'next';
+import { fetchCategoryBySlug } from '@/lib/seo';
+import { CategoriaContent } from './categoria-content';
 
-import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { ProductGrid } from '@/components/product/product-grid';
-import { ProductGridSkeleton } from '@/components/ui/skeleton';
-import { friendlyMessage } from '@/lib/errors';
-import { useProducts } from '@/hooks/use-products';
+interface PageProps {
+  params: Promise<{ slug: string }>;
+}
 
-export default function CategoriaPage() {
-  const params = useParams<{ slug: string }>();
-  const slug = typeof params.slug === 'string' ? params.slug : '';
-  const { data, isLoading, isError, error } = useProducts({
-    category: slug,
-    available: true,
-    sort: 'name-asc',
-  });
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const category = await fetchCategoryBySlug(slug);
 
-  return (
-    <div className="flex flex-col gap-4 py-5">
-      <nav aria-label="Trilha de navegação" className="text-sm text-ink-400">
-        <Link href="/categorias" className="hover:text-accent-600">
-          Categorias
-        </Link>
-        <span aria-hidden> / </span>
-        <span className="font-medium text-ink-600">{data?.items[0]?.category?.name ?? slug}</span>
-      </nav>
+  if (!category) {
+    return { title: 'Categoria não encontrada', robots: { index: false } };
+  }
 
-      <h1 className="text-xl font-bold capitalize text-ink-900">{slug.replace(/-/g, ' ')}</h1>
+  const description =
+    category.description ?? `Confira os produtos de ${category.name} disponíveis na E-Horta.`;
+  const url = `/categorias/${slug}`;
 
-      {isLoading && <ProductGridSkeleton />}
-      {isError && (
-        <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
-          {friendlyMessage(error)}
-        </p>
-      )}
-      {data && data.items.length === 0 && (
-        <p className="py-10 text-center text-sm text-ink-500">Nenhum produto nesta categoria ainda.</p>
-      )}
-      {data && data.items.length > 0 && <ProductGrid products={data.items} />}
-    </div>
-  );
+  return {
+    title: category.name,
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      title: `${category.name} · E-Horta`,
+      description,
+      url,
+      type: 'website',
+      images: category.imageUrl ? [{ url: category.imageUrl }] : undefined,
+    },
+  };
+}
+
+export default async function CategoriaPage({ params }: PageProps) {
+  const { slug } = await params;
+  return <CategoriaContent slug={slug} />;
 }

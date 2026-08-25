@@ -547,7 +547,7 @@ describe('OrdersService', () => {
 
       expect(prisma.order.update).toHaveBeenCalledWith({
         where: { id: 'order-1' },
-        data: { status: 'PREPARING' },
+        data: { status: 'PREPARING', shippingStatus: 'PROCESSING' },
       });
       expect(prisma.shipping.updateMany).toHaveBeenCalledWith({
         where: { orderId: 'order-1' },

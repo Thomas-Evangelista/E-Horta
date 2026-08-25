@@ -4,7 +4,128 @@ Registro de modificações do projeto, organizado por fase de implementação.
 
 ---
 
-## Fase 13 — Conta Completa e Correções de UX *(atual)*
+## Fase 16 — Infraestrutura: Docker da Aplicação *(atual)*
+
+**Escopo:** spec `21-infraestrutura.md` (seção Docker). Imagens de produção da api e web orquestradas pelo compose.
+
+### Imagens
+
+- **`apps/api/Dockerfile`** multi-stage: `deps` (instala workspace por manifest, cache de layer) → `build` (`prisma generate` + `nest build`) → `prod-deps` (closure de produção via `pnpm deploy` + regenerate do client) → `runner` alpine non-root
+  - Migrações aplicadas automaticamente no boot (`prisma migrate deploy && node dist/main.js`)
+  - HEALTHCHECK em `/api/v1/health`; toolchain nativa (bcrypt) apenas nos stages de build
+- **`apps/web/Dockerfile`**: `output: 'standalone'`; `NEXT_PUBLIC_API_URL`/`NEXT_PUBLIC_SITE_URL` como build args; runner non-root com standalone + static + public
+
+### Compose
+
+- Serviços `api` e `web` sob **profile `app`** — `docker compose up -d` segue trazendo só a infra; stack completa com `--profile app`
+- Scripts raiz novos: `docker:app`, `docker:app:down`, `docker:app:logs`
+- `.dockerignore` na raiz (node_modules, .next, dist, .env, logs)
+
+### Fetch server-side
+
+- **Nova env `API_SERVER_URL`**: fetches de SSR/metadata/sitemap podem mirar a URL interna da rede Docker (`http://api:8080/api/v1`) em vez da pública — corrigia "Produto não encontrado" dentro do container
+- `prisma` movido para dependencies da api + script `start:migrate`
+
+### Verificação
+
+- Build das duas imagens ok; stack completa no ar (api healthy)
+- Smoke pelos containers: health, home com hero SSR, `/produtos/mandioca` com `<title>`/canonical, `/categorias/verduras`, login admin E2E
+- Dev local restaurado após o teste (`compose down` derruba o projeto inteiro — infra recriada)
+
+---
+
+## Melhorias de Interface *(pós-Fase 15)*
+
+**Escopo:** revisão geral de UX/acessibilidade sem quebras.
+
+- **Bottom nav mobile:** item "Buscar" trocado por "Carrinho" — em <640px o carrinho estava inacessível; busca permanece no header
+- **Hero banner:** entrada animada + cesta flutuante + halos decorativos (client component, respeita `prefers-reduced-motion`)
+- **Carrossel de produtos:** setas desabilitam nos extremos da rolagem
+- **Chips de categoria:** fade gradiente indicando rolagem horizontal
+- **Carrinho:** estado de erro com botão "Tentar novamente"
+- **Notificações:** tempo relativo ("agora", "há 5 min", "ontem") via `formatRelativeTime`
+- **Acessibilidade:** removido `focus-visible:outline-none` do link-imagem do ProductCard; toast fecha com ícone `X`
+- **CSS global:** `::selection` temática e tap-highlight transparente; skeleton de produto mais fiel ao card
+- Verificação: lint 0 erros · typecheck limpo · build ok · 12 rotas respondendo 200
+
+---
+
+## Fase 15 — SEO, Performance e PWA
+
+**Escopo:** spec `20-performance-seo.md` no frontend. Páginas públicas indexáveis, dados estruturados e base PWA.
+
+### SEO
+
+- **Página de produto** (`/produtos/[slug]`) convertida para Server Component com `generateMetadata`:
+  - `title`, `description`, `canonical`, Open Graph com imagem do produto
+  - UI interativa extraída para `produto-content.tsx` (client island)
+  - **JSON-LD `Product`**: preço BRL, disponibilidade (estoque − reservado), `aggregateRating` via endpoint de resumo de avaliações
+- **Página de categoria** (`/categorias/[slug]`) no mesmo padrão (`categoria-content.tsx`)
+- **Layouts de rota** com metadata estática: carrinho, checkout, conta, pedidos e notificações marcados `noindex`; categorias indexável com canonical
+- **`robots.ts`**: bloqueia áreas privadas e busca; aponta para o sitemap
+- **`sitemap.ts`** dinâmico: home + categorias + produtos (revalida a cada 1h)
+- Layout raiz com `metadataBase`, Open Graph padrão (`pt_BR`) e `applicationName`
+
+### PWA
+
+- **`manifest.ts`**: nome, cores do tema, display standalone, ícone SVG
+- Ícone do app em `app/icon.svg` (favicon automático) e `public/icons/icon.svg`
+- Service worker/offline deliberadamente adiado conforme a spec ("arquitetura não deve impedir essa evolução")
+
+### Performance
+
+- Imagem principal do produto com `fetchPriority="high"`; demais imagens já usavam `loading="lazy"`
+- Fetches server-side de metadata com `revalidate` (60s produto / 300s categoria e sitemap)
+
+### Variável nova
+
+- `NEXT_PUBLIC_SITE_URL` — URL canônica do frontend (metadataBase, sitemap, robots)
+
+### Verificação
+
+- Lint 0 erros · typecheck limpo · build ok
+- Smoke: HTML servido contém `<title>`, OG tags e JSON-LD do produto; `/sitemap.xml`, `/robots.txt`, `/manifest.webmanifest` respondem 200
+
+---
+
+## Fase 14 — Detalhe do Pedido, Avaliações e Notificações
+
+**Escopo:** specs `11-pedidos.md`, `15-avaliacoes.md`, `16-notificacoes.md` no frontend.
+
+### Pedido
+
+- **`/pedidos/[id]`**: linha do tempo animada (realizado → pago → preparo → rota → entregue), banner próprio para cancelados (data + motivo), itens com link para o produto, resumo financeiro, endereço snapshot, pagamento, observações
+- Ações: **cancelar** (formulário com motivo opcional; apenas quando a API permite) e **repetir pedido** (toast com adicionados/indisponíveis + redirect ao carrinho)
+- Correção: cards da lista `/pedidos` apontavam para a própria página; agora abrem o detalhe
+- Labels de status centralizados em `lib/order-status.ts` (incluía status inexistentes como `PENDING`)
+
+### Avaliações
+
+- `ReviewForm` na página do produto: seletor de estrelas (1–5) com labels, comentário opcional, estado de sucesso
+- Gate de compra respeitado (`REVIEW_PURCHASE_REQUIRED` → mensagem amigável); duplicada bloqueada pela API
+- Pedidos entregues exibem "Avaliar" por item com deep-link `?avaliar=1#avaliar`
+- CTA "Entre na sua conta" com redirect de volta ao produto
+
+### Notificações
+
+- Sino no header com badge de não lidas (polling 60s, apenas autenticado)
+- **`/notificacoes`**: lista com destaque para não lidas, marcar uma/todas como lidas, empty state
+- Hooks novos: `use-orders.ts`, `use-notifications.ts`, `use-reviews.ts`
+
+### API
+
+- Itens de `GET /orders/:id` (cliente e admin) passam a incluir `slug` do produto
+- **Bugfix pré-existente:** transições admin não sincronizavam `Order.shippingStatus` (ficava `PENDING` mesmo entregue); agora atualizado na mesma transação conforme mapa de status
+
+### Verificação
+
+- Lint 0 erros · typecheck limpo · build ok · Testes: **135/135**
+- E2E real: cadastro → carrinho → frete → checkout PIX → pagamento aprovado → review criada (duplicada bloqueada) → 3 notificações geradas → read/read-all → cancelamento pós-pagamento bloqueado → rotas web 200
+- Sync de `shippingStatus` validado: `PROCESSING` no preparo, `SHIPPED` em rota
+
+---
+
+## Fase 13 — Conta Completa e Correções de UX
 
 **Motivação:** relatos do usuário — pedidos não abriam, menu mobile ainda rolava, categorias feia. Continuação: gestão de perfil e endereços (spec `06-usuarios-enderecos.md` no frontend).
 

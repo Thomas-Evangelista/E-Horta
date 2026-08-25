@@ -3,15 +3,24 @@ import { Suspense } from 'react';
 import { BottomNav } from '@/components/layout/bottom-nav';
 import { Header } from '@/components/layout/header';
 import { Providers } from './providers';
+import { siteUrl } from '@/lib/seo';
 import './globals.css';
 
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl()),
   title: {
     default: 'E-Horta — Hortaliças e produtos frescos',
     template: '%s · E-Horta',
   },
   description:
     'Compre hortaliças, frutas e legumes frescos com entrega rápida. Do campo pra sua casa.',
+  applicationName: 'E-Horta',
+  openGraph: {
+    type: 'website',
+    siteName: 'E-Horta',
+    locale: 'pt_BR',
+    url: '/',
+  },
 };
 
 export const viewport: Viewport = {

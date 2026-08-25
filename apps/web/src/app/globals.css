@@ -43,6 +43,12 @@
 
 body {
   @apply bg-cream-50 text-ink-800 font-sans antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background-color: var(--color-accent-100);
+  color: var(--color-ink-900);
 }
 
 *:focus-visible {

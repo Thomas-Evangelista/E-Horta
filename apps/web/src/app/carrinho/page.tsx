@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowRight, Minus, Plus, ShoppingBag, Trash2 } from 'lucide-react';
+import { ArrowRight, Minus, Plus, RotateCcw, ShoppingBag, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/feedback/toast';
@@ -58,7 +58,7 @@ function QuantityStepper({
 export default function CarrinhoPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const { data: cart, isLoading, isError, error } = useCart();
+  const { data: cart, isLoading, isError, error, refetch } = useCart();
   const updateItem = useUpdateCartItem();
   const removeItem = useRemoveCartItem();
   const clearCart = useClearCart();
@@ -109,10 +109,22 @@ export default function CarrinhoPage() {
 
   if (isError) {
     return (
-      <div className="py-16 text-center">
-        <p role="alert" className="text-sm text-red-700">
+      <div className="mx-auto flex w-full max-w-md flex-col items-center gap-4 py-16 text-center">
+        <span aria-hidden className="text-5xl">
+          🥀
+        </span>
+        <h1 className="text-xl font-bold text-ink-900">Não foi possível carregar o carrinho</h1>
+        <p role="alert" className="max-w-xs text-sm text-ink-500">
           {friendlyMessage(error)}
         </p>
+        <button
+          type="button"
+          onClick={() => void refetch()}
+          className="mt-1 inline-flex h-11 items-center gap-2 rounded-pill bg-accent-500 px-6 text-sm font-bold text-white hover:bg-accent-600"
+        >
+          <RotateCcw size={16} aria-hidden />
+          Tentar novamente
+        </button>
       </div>
     );
   }

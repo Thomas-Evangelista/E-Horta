@@ -4,12 +4,12 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Home, Package, Search, ShoppingBasket, User } from 'lucide-react';
+import { Home, Package, ShoppingCart, ShoppingBasket, User } from 'lucide-react';
 
 const ITEMS = [
   { href: '/', label: 'Início', icon: Home },
   { href: '/categorias', label: 'Categorias', icon: ShoppingBasket },
-  { href: '/busca', label: 'Buscar', icon: Search },
+  { href: '/carrinho', label: 'Carrinho', icon: ShoppingCart },
   { href: '/pedidos', label: 'Pedidos', icon: Package },
   { href: '/conta', label: 'Conta', icon: User },
 ] as const;

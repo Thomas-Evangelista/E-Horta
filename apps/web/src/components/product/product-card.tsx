@@ -58,7 +58,7 @@ export function ProductCard({ product }: { product: Product }) {
 
   return (
     <article className="group flex flex-col overflow-hidden rounded-card border border-cream-200 bg-white shadow-card transition-shadow hover:shadow-md">
-      <Link href={`/produtos/${product.slug}`} className="focus-visible:outline-none" aria-label={product.name}>
+      <Link href={`/produtos/${product.slug}`} aria-label={product.name}>
         <ProductImage product={product} />
       </Link>
 

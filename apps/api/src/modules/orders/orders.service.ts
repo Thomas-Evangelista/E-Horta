@@ -39,6 +39,7 @@ export interface OrderDetail {
   createdAt: Date;
   items: Array<{
     productId: string;
+    slug: string | null;
     name: string;
     sku: string;
     unitPrice: number;
@@ -176,7 +177,7 @@ export class OrdersService {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, userId },
       include: {
-        items: { orderBy: { id: 'asc' } },
+        items: { orderBy: { id: 'asc' }, include: { product: { select: { slug: true } } } },
         shipping: true,
         payments: { orderBy: { createdAt: 'desc' }, take: 1 },
         _count: { select: { payments: true } },
@@ -209,6 +210,7 @@ export class OrdersService {
       createdAt: order.createdAt,
       items: order.items.map((item) => ({
         productId: item.productId,
+        slug: item.product?.slug ?? null,
         name: item.productNameSnapshot,
         sku: item.skuSnapshot,
         unitPrice: toNumber(item.unitPrice),
@@ -493,7 +495,7 @@ export class OrdersService {
       where: { id: orderId },
       include: {
         user: { select: { id: true, name: true, email: true } },
-        items: { orderBy: { id: 'asc' } },
+        items: { orderBy: { id: 'asc' }, include: { product: { select: { slug: true } } } },
         shipping: true,
         payments: { orderBy: { createdAt: 'desc' }, take: 1 },
         _count: { select: { payments: true } },
@@ -525,6 +527,7 @@ export class OrdersService {
       customer: order.user,
       items: order.items.map((item) => ({
         productId: item.productId,
+        slug: item.product?.slug ?? null,
         name: item.productNameSnapshot,
         sku: item.skuSnapshot,
         unitPrice: toNumber(item.unitPrice),
@@ -637,10 +640,13 @@ export class OrdersService {
           });
         }
 
+        const shippingStatus = SHIPPING_STATUS_BY_ORDER_STATUS[dto.status];
+
         const updatedOrder = await tx.order.update({
           where: { id: order.id },
           data: {
             status: dto.status,
+            ...(shippingStatus && { shippingStatus }),
             ...(dto.status === 'CANCELLED' && {
               cancelledAt: new Date(),
               cancellationReason: dto.reason ?? null,
@@ -649,8 +655,6 @@ export class OrdersService {
         });
         updatedUserId = updatedOrder.userId;
         updatedOrderNumber = updatedOrder.orderNumber;
-
-        const shippingStatus = SHIPPING_STATUS_BY_ORDER_STATUS[dto.status];
 
         if (shippingStatus) {
           await tx.shipping.updateMany({

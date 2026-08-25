@@ -221,3 +221,83 @@ export interface OrderPaymentViewDTO {
   paidAt: string | null;
   attempts: number;
 }
+
+export type OrderStatusDTO =
+  | 'PENDING_PAYMENT'
+  | 'PAYMENT_APPROVED'
+  | 'PREPARING'
+  | 'READY_FOR_DELIVERY'
+  | 'OUT_FOR_DELIVERY'
+  | 'DELIVERED'
+  | 'CANCELLED';
+
+export interface OrderDetailItemDTO {
+  productId: string;
+  slug: string | null;
+  name: string;
+  sku: string;
+  unitPrice: number;
+  quantity: number;
+  total: number;
+}
+
+export interface AddressSnapshotDTO {
+  label?: string | null;
+  zipCode?: string;
+  street?: string;
+  number?: string;
+  complement?: string | null;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
+}
+
+export interface OrderDetailDTO {
+  id: string;
+  orderNumber: string;
+  status: OrderStatusDTO;
+  paymentStatus: string;
+  shippingStatus: string;
+  subtotal: number;
+  discount: number;
+  shippingFee: number;
+  total: number;
+  addressSnapshot: AddressSnapshotDTO | null;
+  notes: string | null;
+  cancelledAt: string | null;
+  cancellationReason: string | null;
+  createdAt: string;
+  items: OrderDetailItemDTO[];
+  shipping: {
+    method: string;
+    status: string;
+    trackingCode: string | null;
+    estimatedDays: number | null;
+  } | null;
+  payment: {
+    method: string;
+    status: string;
+    amount: number;
+    paidAt: string | null;
+  } | null;
+  paymentAttempts: number;
+  cancellable: boolean;
+}
+
+export interface RepeatOrderResultDTO {
+  addedItems: Array<{ productId: string; name: string; quantity: number }>;
+  skippedItems: Array<{
+    productId: string;
+    name: string;
+    reason: 'PRODUCT_UNAVAILABLE' | 'INSUFFICIENT_STOCK';
+    availableStock?: number;
+  }>;
+}
+
+export interface NotificationDTO {
+  id: string;
+  title: string;
+  message: string;
+  read: boolean;
+  createdAt: string;
+}

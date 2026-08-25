@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { CheckCircle2, Info, XCircle } from 'lucide-react';
+import { CheckCircle2, Info, X, XCircle } from 'lucide-react';
 
 type ToastTone = 'success' | 'error' | 'info';
 
@@ -77,9 +77,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                   type="button"
                   onClick={() => dismiss(id)}
                   aria-label="Fechar notificação"
-                  className="ml-auto rounded p-1 text-ink-400 hover:text-ink-600"
+                  className="ml-auto rounded p-1 text-ink-400 transition-colors hover:text-ink-600"
                 >
-                  <XCircle size={16} aria-hidden />
+                  <X size={16} aria-hidden />
                 </button>
               </motion.div>
             );

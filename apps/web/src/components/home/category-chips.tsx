@@ -19,7 +19,7 @@ export function CategoryChips() {
   if (!categories || categories.length === 0) return null;
 
   return (
-    <nav aria-label="Categorias">
+    <nav aria-label="Categorias" className="relative">
       <ul className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <li>
           <Link
@@ -40,6 +40,10 @@ export function CategoryChips() {
           </li>
         ))}
       </ul>
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-cream-50 to-transparent"
+      />
     </nav>
   );
 }
