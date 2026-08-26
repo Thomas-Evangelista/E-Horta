@@ -39,6 +39,64 @@ importers:
         specifier: ^5.7.0
         version: 5.9.3
 
+  apps/admin:
+    dependencies:
+      '@e-horta/types':
+        specifier: workspace:*
+        version: link:../../packages/types
+      '@e-horta/validation':
+        specifier: workspace:*
+        version: link:../../packages/validation
+      '@hookform/resolvers':
+        specifier: ^5.2.2
+        version: 5.9.1(@sinclair/typebox@0.27.12)(@standard-schema/spec@1.1.0)(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(class-transformer@0.5.1)(class-validator@0.14.4)(effect@3.21.0)(react-hook-form@7.86.0(react@19.1.0))(zod@3.25.76)
+      '@tanstack/react-query':
+        specifier: ^5.90.2
+        version: 5.102.2(react@19.1.0)
+      framer-motion:
+        specifier: ^12.23.12
+        version: 12.43.0(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+      lucide-react:
+        specifier: ^0.544.0
+        version: 0.544.0(react@19.1.0)
+      next:
+        specifier: ^15.5.4
+        version: 15.5.23(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+      react:
+        specifier: 19.1.0
+        version: 19.1.0
+      react-dom:
+        specifier: 19.1.0
+        version: 19.1.0(react@19.1.0)
+      react-hook-form:
+        specifier: ^7.63.0
+        version: 7.86.0(react@19.1.0)
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
+      zustand:
+        specifier: ^5.0.8
+        version: 5.0.15(@types/react@19.2.18)(react@19.1.0)
+    devDependencies:
+      '@e-horta/tsconfig':
+        specifier: workspace:*
+        version: link:../../packages/tsconfig
+      '@tailwindcss/postcss':
+        specifier: ^4.1.13
+        version: 4.3.3
+      '@types/react':
+        specifier: ^19.1.12
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: ^19.1.9
+        version: 19.2.5(@types/react@19.2.18)
+      tailwindcss:
+        specifier: ^4.1.13
+        version: 4.3.3
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+
   apps/api:
     dependencies:
       '@nestjs/common':

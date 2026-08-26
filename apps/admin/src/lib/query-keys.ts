@@ -1,0 +1,13 @@
+export const queryKeys = {
+  dashboard: ['dashboard'] as const,
+  products: (filters?: Record<string, unknown>) => ['admin', 'products', filters ?? {}] as const,
+  productDetail: (id: string) => ['admin', 'products', id] as const,
+  orders: (filters?: Record<string, unknown>) => ['admin', 'orders', filters ?? {}] as const,
+  orderDetail: (id: string) => ['admin', 'orders', id] as const,
+  users: (filters?: Record<string, unknown>) => ['admin', 'users', filters ?? {}] as const,
+  categories: ['admin', 'categories'] as const,
+  inventory: ['admin', 'inventory'] as const,
+  lowStock: ['admin', 'inventory', 'low-stock'] as const,
+  promotions: (filters?: Record<string, unknown>) => ['admin', 'promotions', filters ?? {}] as const,
+  reviews: (filters?: Record<string, unknown>) => ['admin', 'reviews', filters ?? {}] as const,
+} as const;
