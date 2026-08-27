@@ -1,0 +1,149 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PNPM_VERSION: 9.15.0
+  NODE_VERSION: 20
+
+jobs:
+  quality:
+    name: Lint, Typecheck, Testes e Build
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_API_URL: http://localhost:8080/api/v1
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile
+
+      - name: Gerar Prisma Client
+        run: pnpm --filter @e-horta/api exec prisma generate --schema=../../prisma/schema.prisma
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Testes unitários
+        run: pnpm test
+
+      - name: Build API
+        run: pnpm build
+
+      - name: Build Web
+        run: pnpm build:web
+
+      - name: Build Admin
+        run: pnpm build:admin
+
+  integration:
+    name: Testes de integração da API
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ehorta
+          POSTGRES_PASSWORD: ehorta_dev_2024
+          POSTGRES_DB: e_horta_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ehorta -d e_horta_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      TEST_DATABASE_URL: postgresql://ehorta:ehorta_dev_2024@localhost:5432/e_horta_test
+      DATABASE_URL: postgresql://ehorta:ehorta_dev_2024@localhost:5432/e_horta_test
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: ci_jwt_secret_e2e_test_0123456789abcdef0123456789abcdef
+      JWT_REFRESH_SECRET: ci_refresh_secret_e2e_test_abcdef0123456789abcdef0123456789
+      PAYMENT_PROVIDER: sandbox
+      PAYMENT_WEBHOOK_SECRET: whsec_ci_e2e_test_secret_123456
+      ENABLE_SANDBOX_SIMULATE: 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile
+
+      - name: Gerar Prisma Client
+        run: pnpm --filter @e-horta/api exec prisma generate --schema=../../prisma/schema.prisma
+
+      - name: Testes de integração (API)
+        run: pnpm --filter @e-horta/api test:e2e
+
+  e2e:
+    name: E2E (Playwright + stack Docker)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile
+
+      - name: Preparar .env (para db:deploy/db:seed no host)
+        run: cp .env.example .env
+
+      - name: Instalar navegador Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Testes E2E
+        run: pnpm test:e2e

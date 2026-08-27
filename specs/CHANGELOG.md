@@ -4,7 +4,55 @@ Registro de modificações do projeto, organizado por fase de implementação.
 
 ---
 
-## Fase 22.2 — Testes: unidade/integração da API, frontend e E2E *(atual)*
+## Fase 23 — CI/CD e Documentação *(atual)*
+
+**Escopo:** implementar a pipeline de CI/CD (spec `23-ci-cd-documentacao.md`) e a
+documentação técnica do projeto (README + `docs/`).
+
+### CI/CD (`.github/workflows/ci.yml`)
+
+Pipeline conforme o spec:
+
+```
+install → lint → typecheck → unit tests → integration tests → build → e2e
+```
+
+Jobs:
+
+- **`quality`** — instala dependências, gera o Prisma Client, roda `lint`,
+  `typecheck` e os testes unitários de todos os workspaces, e faz o `build` da
+  API, do Web e do Admin.
+- **`integration`** — provisiona o **PostgreSQL** (banco `e_horta_test`) e o
+  **Redis** como serviços do GitHub Actions e roda os testes de integração da
+  API (`apps/api/test:e2e`), respeitando a URL de teste via variáveis de
+  ambiente.
+- **`e2e`** — instala o Chromium do Playwright, prepara o `.env` a partir do
+  `.env.example` e roda os cenários E2E completos (sobe a stack via Docker
+  Compose dentro do runner).
+
+Regras de aprovação: um PR **não** é aprovado se lint, TypeScript, testes ou
+build falharem.
+
+### Documentação
+
+- `README.md` — revisado com a seção de documentação.
+- `docs/architecture.md` — arquitetura do monorepo, backend e frontend.
+- `docs/api.md` — endpoints REST por módulo + nota sobre o Swagger.
+- `docs/database.md` — schema Prisma, enums e relacionamentos.
+- `docs/deployment.md` — deploy via Docker Compose e variáveis de ambiente.
+- `docs/business-rules.md` — regras de negócio (Fase 24) e fluxos.
+
+### Observações
+
+- O **Swagger** (`/api/docs`) e o endpoint de sandbox de pagamento já estavam
+  disponíveis em desenvolvimento e seguem **desabilitados em produção**
+  (`NODE_ENV=production` e `ENABLE_SANDBOX_SIMULATE=false`).
+- O `.env` de testes (`apps/api/test/.env`) permanece **gitignored**; no CI, as
+  variáveis de integração são fornecidas via ambiente do workflow.
+
+---
+
+## Fase 22.2 — Testes: unidade/integração da API, frontend e E2E
 
 **Escopo:** preencher as lacunas de cobertura da Fase 22 (spec `22-testes.md`): testes
 unitários da API, testes de integração (Supertest + banco isolado), testes frontend restantes

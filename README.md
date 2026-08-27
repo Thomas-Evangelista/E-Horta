@@ -33,6 +33,16 @@ e-horta/
 └── docker-compose.yml
 ```
 
+## Documentação
+
+| Documento | Conteúdo |
+|-----------|----------|
+| [`docs/architecture.md`](docs/architecture.md) | Arquitetura do monorepo, backend e frontend |
+| [`docs/api.md`](docs/api.md) | Endpoints REST por módulo (+ Swagger) |
+| [`docs/database.md`](docs/database.md) | Schema Prisma, enums e relacionamentos |
+| [`docs/deployment.md`](docs/deployment.md) | Deploy via Docker Compose e variáveis de ambiente |
+| [`docs/business-rules.md`](docs/business-rules.md) | Regras de negócio e fluxos |
+
 ## Como rodar
 
 ### Opção 1: Docker (tudo em containers) — recomendado
