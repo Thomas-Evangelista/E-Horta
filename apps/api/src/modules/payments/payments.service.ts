@@ -402,10 +402,10 @@ export class PaymentsService {
     paymentId: string,
     outcome: 'approved' | 'failed',
   ): Promise<WebhookProcessResult> {
-    const isProduction =
-      this.configService.get<string>('NODE_ENV') === 'production';
+    const isSandboxDisabled =
+      this.configService.get<string>('ENABLE_SANDBOX_SIMULATE') !== 'true';
 
-    if (isProduction) {
+    if (isSandboxDisabled) {
       throw new NotFoundException('Endpoint indisponível');
     }
 

@@ -4,6 +4,53 @@ Registro de modificações do projeto, organizado por fase de implementação.
 
 ---
 
+## Fase 22.1 — Testes de Unidade no Frontend + consolidação
+
+**Escopo:** spec `22-testes.md` no frontend (Vitest + React Testing Library) e reestruturação
+do Docker já iniciadas; consolidação do trabalho em andamento.
+
+### Frontend (web e admin) — Vitest + RTL
+
+- **Setup compartilhado** por app: `vitest.config.ts` (jsdom, alias `@`, TZ UTC, `css:false`)
+  e `vitest.setup.ts` (jest-dom, `cleanup`, mock de `matchMedia`, `requestAnimationFrame` e
+  `framer-motion` para renderização determinística em jsdom, respeitando `prefers-reduced-motion`)
+- Scripts `test` / `test:watch` adicionados aos dois `package.json`
+- **Web — 69 testes** em 12 arquivos: Button, Badge, PasswordStrengthMeter, ProductCard,
+  ToastProvider, e libs puras (form-errors, format, order-status, password-strength, cart-token,
+  errors, api-types)
+- **Admin — 27 testes** em 6 arquivos: Pagination, EmptyState, e libs (constants, errors, format,
+  zod-helpers)
+- **Playwright E2E** (`e2e/`, spec `22`): fluxo principal de compra (`compra.spec.ts`) e cenários
+  negativos (`negativos.spec.ts`), com `fixtures.ts` (registro, endereço, produto) e
+  `playwright.config.ts` (workers 1, retries 1, baseURL web, webServer sobe a stack com
+  `db:deploy` + `db:seed`)
+- Scripts/artefatos: `pnpm test` (roda testes de todos os workspaces), `pnpm test:e2e`,
+  `playwright-report/` ignorado
+
+### Docker (refino da Fase 16)
+
+- **Imagem `admin`** (`apps/admin/Dockerfile`) no mesmo padrão standalone do web (porta 3001)
+- `docker-compose.yml` agora com **serviço `admin`**; stack completa sobe com um único
+  `docker compose up -d` (profile `app` removido)
+- Portas expostas apenas em **`127.0.0.1`** (postgres, redis, minio, api, web, admin)
+- `restart: unless-stopped` removido (amigável ao desenvolvimento local)
+- `ENABLE_SANDBOX_SIMULATE` substitui a lógica anterior do sandbox de pagamento — o endpoint
+  `POST /payments/sandbox/:id/simulate` fica habilitado só quando `true` (em vez de depender do
+  `NODE_ENV`)
+- Scripts raiz: `docker:up` (derruba e reconstrói a stack completa), `docker:down`, `docker:logs`;
+  `db:deploy`; `dev:all` (hot-reload dos 3 apps)
+
+### Verificação
+
+- Migration `20260826184841_init` valida o schema: remove índices únicos redundantes de `reviews`
+  (`reviews_user_id_idx`, `reviews_product_id_idx`) — `migrate deploy` limpo, sem drift
+- Artefato de build `apps/admin/tsconfig.tsbuildinfo` removido do rastreamento (`*.tsbuildinfo`
+  no `.gitignore`)
+- Lint 0 erros (82 warnings pré-existentes) · typecheck limpo (api/web/admin)
+- Testes: API **135/135** · Web **69/69** · Admin **27/27**
+
+---
+
 ## Fase 16 — Infraestrutura: Docker da Aplicação *(atual)*
 
 **Escopo:** spec `21-infraestrutura.md` (seção Docker). Imagens de produção da api e web orquestradas pelo compose.
@@ -17,8 +64,9 @@ Registro de modificações do projeto, organizado por fase de implementação.
 
 ### Compose
 
-- Serviços `api` e `web` sob **profile `app`** — `docker compose up -d` segue trazendo só a infra; stack completa com `--profile app`
-- Scripts raiz novos: `docker:app`, `docker:app:down`, `docker:app:logs`
+- Serviços `api`, `web` e `admin` sob **profile `app`** — `docker compose up -d` trazendo só a infra; stack completa com `--profile app`
+  - *(posterior: profile removido — um único `docker compose up -d` sobe a stack completa, sem `restart: unless-stopped` em desenvolvimento)*
+- Scripts raiz novos: `docker:up` (encerra containers existentes e reconstrói a stack), `docker:down`, `docker:logs`
 - `.dockerignore` na raiz (node_modules, .next, dist, .env, logs)
 
 ### Fetch server-side
