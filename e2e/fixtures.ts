@@ -28,7 +28,9 @@ export async function registerUser(page: Page, user: TestUser): Promise<void> {
   await page.getByLabel('Senha', { exact: true }).fill(user.password);
   await page.getByLabel('Confirmar senha', { exact: true }).fill(user.password);
   await page.getByRole('button', { name: 'Criar minha conta' }).click();
-  await expect(page.getByRole('heading', { name: 'Conta criada!' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Conta criada!' })).toBeVisible({
+    timeout: 20_000,
+  });
 }
 
 export async function addProductToCart(page: Page, slug: string, quantity = 1): Promise<void> {

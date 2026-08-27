@@ -64,7 +64,7 @@ test.describe('Cenários negativos', () => {
       data: { outcome: 'failed' },
       headers: { Authorization: `Bearer ${token}` },
     });
-    expect(sim.status).toBe(201);
+    expect(sim.status()).toBe(201);
     const simBody = (await sim.json()) as {
       data?: { orderStatus?: string; paymentStatus?: string };
     };

@@ -224,7 +224,10 @@ describe('PaymentsService', () => {
       });
       expect(inventoryService.releaseReservations).toHaveBeenCalled();
       expect(inventoryService.confirmReductions).not.toHaveBeenCalled();
-      expect(prisma.order.update).not.toHaveBeenCalled();
+      expect(prisma.order.update).toHaveBeenCalledWith({
+        where: { id: 'order-1' },
+        data: { paymentStatus: 'FAILED' },
+      });
     });
 
     it('deve ignorar pagamento já processado (status diferente de PENDING)', async () => {

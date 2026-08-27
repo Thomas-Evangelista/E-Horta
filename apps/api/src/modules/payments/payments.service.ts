@@ -323,7 +323,8 @@ export class PaymentsService {
         }
 
         // payment.failed: libera reserva; pedido permanece PENDING_PAYMENT
-        // para permitir nova tentativa sem criar outro pedido (spec #69).
+        // para permitir nova tentativa sem criar outro pedido (spec #69),
+        // mas reflete a falha em paymentStatus do pedido.
         appliedOrderId = payment.order_id;
         await tx.payment.update({
           where: { id: payment.id },
@@ -334,6 +335,11 @@ export class PaymentsService {
               providerPaymentId: payload.data.providerPaymentId ?? null,
             }),
           },
+        });
+
+        await tx.order.update({
+          where: { id: payment.order_id },
+          data: { paymentStatus: 'FAILED' },
         });
 
         await this.inventoryService.releaseReservations(tx, stockItems);
