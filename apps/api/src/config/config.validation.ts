@@ -23,6 +23,10 @@ const configSchema = z.object({
   PAYMENT_PROVIDER: z.string().optional(),
   PAYMENT_API_KEY: z.string().optional(),
   PAYMENT_WEBHOOK_SECRET: z.string().optional(),
+  ENABLE_SANDBOX_SIMULATE: z
+    .enum(['true', 'false'])
+    .optional()
+    .default('false'),
 });
 
 export function configValidation(config: Record<string, unknown>) {

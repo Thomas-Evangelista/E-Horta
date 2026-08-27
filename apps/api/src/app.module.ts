@@ -28,7 +28,12 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
     ConfigModule.forRoot({
       isGlobal: true,
       validate: configValidation,
-      envFilePath: ['.env.local', '.env', '../../.env.local', '../../.env'],
+      // Em testes, carrega apenas o .env dedicado (banco isolado etc.),
+      // ignorando o .env compartilhado da raiz (spec 22 "banco de testes isolado").
+      envFilePath:
+        process.env.NODE_ENV === 'test'
+          ? ['test/.env', '../../apps/api/test/.env']
+          : ['.env.local', '.env', '../../.env.local', '../../.env'],
     }),
     DatabaseModule,
     HealthModule,

@@ -6,6 +6,8 @@ import {
   createDefaultAddress,
   fetchFirstProduct,
   goToCheckout,
+  loginAsAdmin,
+  purchaseViaApi,
   randomUser,
   registerUser,
 } from './fixtures';
@@ -52,5 +54,57 @@ test.describe('Cenários negativos', () => {
     expect(addResponse.status()).toBe(400);
     const body = (await addResponse.json()) as { error?: { message?: string } };
     expect(body.error?.message).toContain('Estoque insuficiente');
+  });
+
+  test('recusa o pagamento via sandbox e mantém o pedido pendente', async () => {
+    const context = await request.newContext({ baseURL: new URL(API_BASE).origin });
+    const { token, orderId, paymentId } = await purchaseViaApi(context, 2);
+
+    const sim = await context.post(apiUrl(`/payments/sandbox/${paymentId}/simulate`), {
+      data: { outcome: 'failed' },
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(sim.status).toBe(201);
+    const simBody = (await sim.json()) as {
+      data?: { orderStatus?: string; paymentStatus?: string };
+    };
+    expect(simBody.data?.orderStatus).toBe('PENDING_PAYMENT');
+    expect(simBody.data?.paymentStatus).toBe('FAILED');
+
+    const orders = await context.get(apiUrl('/orders'), {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(orders.ok()).toBeTruthy();
+    const ordersBody = (await orders.json()) as {
+      data?: Array<{ id: string; status: string; paymentStatus: string }>;
+    };
+    const order = ordersBody.data?.find((o) => o.id === orderId);
+    expect(order?.status).toBe('PENDING_PAYMENT');
+    expect(order?.paymentStatus).toBe('FAILED');
+  });
+
+  test('mostra produto indisponível quando o estoque é zerado', async ({ page }) => {
+    const context = await request.newContext({ baseURL: new URL(API_BASE).origin });
+    const adminToken = await loginAsAdmin(context);
+    const product = await fetchFirstProduct(context);
+
+    const patch = await context.patch(apiUrl(`/inventory/${product.id}`), {
+      data: { quantity: 0 },
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    expect(patch.ok()).toBeTruthy();
+
+    try {
+      await page.goto(`/produtos/${product.slug}`);
+      await expect(page.getByText('Indisponível no momento').first()).toBeVisible();
+      await expect(
+        page.getByRole('button', { name: 'Adicionar ao carrinho', exact: true }),
+      ).toBeDisabled();
+    } finally {
+      await context.patch(apiUrl(`/inventory/${product.id}`), {
+        data: { quantity: 10 },
+        headers: { Authorization: `Bearer ${adminToken}` },
+      });
+    }
   });
 });

@@ -4,6 +4,58 @@ Registro de modificações do projeto, organizado por fase de implementação.
 
 ---
 
+## Fase 22.2 — Testes: unidade/integração da API, frontend e E2E *(atual)*
+
+**Escopo:** preencher as lacunas de cobertura da Fase 22 (spec `22-testes.md`): testes
+unitários da API, testes de integração (Supertest + banco isolado), testes frontend restantes
+e cenários E2E Playwright.
+
+### API — Testes unitários (4 arquivos novos)
+
+- `common/utils/order-transitions.spec.ts` (7) — máquina de estados do pedido.
+- `modules/auth/auth.service.spec.ts` (14) — register/login/refresh/logout (bcrypt mockado).
+- `modules/inventory/inventory.service.spec.ts` (13) — CRUD, low-stock, reserva (overselling),
+  release (`GREATEST(0,...)`) e confirmReductions — chamadas tipadas com `TransactionClient`.
+- `common/guards/roles.guard.spec.ts` (5) — autorização por `@Roles`.
+
+### API — Testes de integração (Supertest + banco isolado)
+
+- `test/app.e2e-spec.ts` — 19 testes E2E da API cobrindo: auth (register/login/logout/refresh),
+  produtos, carrinho (inclusive `Estoque insuficiente`), checkout completo (endereço → frete →
+  pedido → baixa de estoque), aprovação sandbox PIX e autorização admin.
+- `test/test-db.setup.ts` — helpers: `migrateTestDatabase`, `seedTestDatabase` (determinístico),
+  `cleanTestDatabase` e `getTestPrisma`.
+- **Banco de testes isolado `e_horta_test`** — o `ConfigModule` agora, quando `NODE_ENV=test`,
+  carrega apenas `test/.env` (banco/secret/sandbox de teste), ignorando o `.env` compartilhado.
+- `ENABLE_SANDBOX_SIMULATE` adicionado ao schema de validação de config (antes era removido ao
+  validar, desabilitando o endpoint sandbox).
+
+### Frontend — Unit tests restantes (Vitest)
+
+- `apps/web/src/lib/__tests__/api-client.test.ts` (10) — headers, query, serialização de body,
+  refresh em 401, `onSessionExpired`, erros de rede/envelope.
+- `apps/web/src/lib/__tests__/seo.test.ts` (15) — `siteUrl`, `toSeoNumber`, `buildProductJsonLd`
+  e os fetchers (slug, resumo de avaliações, categorias, sitemap).
+- `apps/admin/src/lib/__tests__/api-client.test.ts` (9) — GET/POST, query, refresh/retry,
+  `SESSION_EXPIRED`, erros (`MALFORMED`, envelope) e `apiUpload` (FormData).
+
+### E2E — Cenários Playwright adicionais
+
+- `e2e/negativos.spec.ts` + `e2e/fixtures.ts`:
+  - **Pagamento recusado** — fluxo completo via API e simulate `outcome: 'failed'`: pedido
+    permanece `PENDING_PAYMENT` e pagamento `FAILED`.
+  - **Produto indisponível** — zera o estoque via API admin (login `admin@ehorta.com.br`) e valida
+    na UI: "Indisponível no momento" e botão de adicionar desabilitado (estoque restaurado ao fim).
+  - helpers: `loginAsAdmin`, `registerViaApi`, `purchaseViaApi`, `fetchFirstProduct` (com `slug`).
+
+### Verificação
+
+- Lint 0 erros · typecheck limpo (api/web/admin) · E2E com typecheck limpo e 7/7 cenários descobertos
+- Testes: API **179** unit + **19** integração · Web **94** · Admin **36** · E2E **7** cenários
+- Dados de teste `e2e-*` removidos do banco principal `e_horta` (poluição dos primeiros executes)
+
+---
+
 ## Fase 22.1 — Testes de Unidade no Frontend + consolidação
 
 **Escopo:** spec `22-testes.md` no frontend (Vitest + React Testing Library) e reestruturação
