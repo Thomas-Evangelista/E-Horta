@@ -11,9 +11,10 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ProductsService, type ProductFilter } from './products.service';
+import type { AuditContext as AuditContextType } from '../audit/audit.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
-import { Roles, Public } from '../../common/decorators';
+import { Roles, Public, AuditContext } from '../../common/decorators';
 
 @ApiTags('Products')
 @Controller('products')
@@ -109,6 +110,7 @@ export class ProductsController {
   @Post()
   @ApiOperation({ summary: 'Criar produto (ADMIN)' })
   async create(
+    @AuditContext() ctx: AuditContextType,
     @Body()
     body: {
       categoryId: string;
@@ -127,7 +129,7 @@ export class ProductsController {
       isFeatured?: boolean;
     },
   ) {
-    const result = await this.productsService.create(body);
+    const result = await this.productsService.create({ ...body, ctx });
     return { data: result, meta: {}, error: null };
   }
 
@@ -138,6 +140,7 @@ export class ProductsController {
   @ApiOperation({ summary: 'Atualizar produto (ADMIN)' })
   async update(
     @Param('id') id: string,
+    @AuditContext() ctx: AuditContextType,
     @Body()
     body: {
       categoryId?: string;
@@ -156,7 +159,7 @@ export class ProductsController {
       isFeatured?: boolean;
     },
   ) {
-    const result = await this.productsService.update(id, body);
+    const result = await this.productsService.update(id, { ...body, ctx });
     return { data: result, meta: {}, error: null };
   }
 

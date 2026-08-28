@@ -1,6 +1,10 @@
 import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { Prisma, type Product, type ProductUnit } from '@prisma/client';
+import {
+  AuditService,
+  type AuditContext,
+} from '../audit/audit.service';
 
 export interface ProductFilter {
   category?: string;
@@ -29,7 +33,10 @@ export interface PaginatedProducts {
 export class ProductsService {
   private readonly logger = new Logger(ProductsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+  ) {}
 
   async findAll(filters: ProductFilter): Promise<PaginatedProducts> {
     const page = filters.page ?? 1;
@@ -310,6 +317,7 @@ export class ProductsService {
     imageUrl?: string;
     isActive?: boolean;
     isFeatured?: boolean;
+    ctx?: AuditContext;
   }) {
     const existingSlug = await this.prisma.product.findUnique({
       where: { slug: data.slug },
@@ -365,6 +373,19 @@ export class ProductsService {
       return p;
     });
 
+    await this.audit.record({
+      ...data.ctx,
+      action: 'PRODUCT_CREATED',
+      entity: 'Product',
+      entityId: product.id,
+      metadata: {
+        name: product.name,
+        sku: product.sku,
+        price: product.price.toNumber(),
+        isActive: product.isActive,
+      },
+    });
+
     this.logger.log(`Product created: ${product.name} (${product.id})`);
     return product;
   }
@@ -386,6 +407,7 @@ export class ProductsService {
       imageUrl?: string | null;
       isActive?: boolean;
       isFeatured?: boolean;
+      ctx?: AuditContext;
     },
   ) {
     const product = await this.findById(id);
@@ -435,6 +457,31 @@ export class ProductsService {
       where: { id },
       data: updateData,
     });
+
+    await this.audit.record({
+      ...data.ctx,
+      action: 'PRODUCT_UPDATED',
+      entity: 'Product',
+      entityId: id,
+      metadata: {
+        name: updated.name,
+        changedFields: {
+          ...(data.name !== undefined && { name: data.name }),
+          ...(data.isActive !== undefined && { isActive: data.isActive }),
+          ...(data.isFeatured !== undefined && { isFeatured: data.isFeatured }),
+        },
+      },
+    });
+
+    if (data.price !== undefined && data.price !== product.price.toNumber()) {
+      await this.audit.record({
+        ...data.ctx,
+        action: 'PRICE_CHANGED',
+        entity: 'Product',
+        entityId: id,
+        metadata: { from: product.price.toNumber(), to: data.price },
+      });
+    }
 
     this.logger.log(`Product updated: ${updated.name} (${updated.id})`);
     return updated;

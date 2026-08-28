@@ -10,7 +10,8 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { InventoryService } from './inventory.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
-import { Roles } from '../../common/decorators';
+import { Roles, AuditContext } from '../../common/decorators';
+import type { AuditContext as AuditContextType } from '../audit/audit.service';
 
 @ApiTags('Inventory')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -40,9 +41,10 @@ export class InventoryController {
   @ApiOperation({ summary: 'Atualizar estoque de um produto (ADMIN)' })
   async updateStock(
     @Param('productId') productId: string,
+    @AuditContext() ctx: AuditContextType,
     @Body() body: { quantity?: number; minimumStock?: number },
   ) {
-    const result = await this.inventoryService.updateStock(productId, body);
+    const result = await this.inventoryService.updateStock(productId, body, ctx);
     return { data: result, meta: {}, error: null };
   }
 }

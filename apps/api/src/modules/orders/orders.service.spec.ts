@@ -1,13 +1,11 @@
 import { Test } from '@nestjs/testing';
-import {
-  ConflictException,
-  NotFoundException,
-} from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { OrdersService } from './orders.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { CartService } from '../cart/cart.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../../database/prisma.service';
 
 const decimal = (value: string) => new Prisma.Decimal(value);
@@ -89,7 +87,6 @@ describe('OrdersService', () => {
       create: jest.Mock;
     };
     shipping: { updateMany: jest.Mock };
-    auditLog: { create: jest.Mock };
   };
   let inventoryService: { releaseReservations: jest.Mock };
   let cartService: {
@@ -97,6 +94,7 @@ describe('OrdersService', () => {
     getCart: jest.Mock;
   };
   let notificationsService: { notify: jest.Mock };
+  let audit: { record: jest.Mock };
 
   const activeCart = { id: 'cart-1', userId: 'user-1', status: 'ACTIVE' };
   const emptyCartResponse = {
@@ -130,7 +128,6 @@ describe('OrdersService', () => {
         create: jest.fn().mockResolvedValue({}),
       },
       shipping: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
-      auditLog: { create: jest.fn().mockResolvedValue({}) },
     };
 
     inventoryService = {
@@ -146,6 +143,8 @@ describe('OrdersService', () => {
       notify: jest.fn(),
     };
 
+    audit = { record: jest.fn().mockResolvedValue(undefined) };
+
     const moduleRef = await Test.createTestingModule({
       providers: [
         OrdersService,
@@ -153,6 +152,7 @@ describe('OrdersService', () => {
         { provide: InventoryService, useValue: inventoryService },
         { provide: CartService, useValue: cartService },
         { provide: NotificationsService, useValue: notificationsService },
+        { provide: AuditService, useValue: audit },
       ],
     }).compile();
 
@@ -254,9 +254,7 @@ describe('OrdersService', () => {
   describe('cancelForUser', () => {
     beforeEach(() => {
       // Consulta pós-transação usada por findByIdForUser.
-      prisma.order.findFirst.mockResolvedValue(
-        buildOrderRecord({ status: 'CANCELLED' }),
-      );
+      prisma.order.findFirst.mockResolvedValue(buildOrderRecord({ status: 'CANCELLED' }));
     });
 
     it('deve cancelar pedido pendente liberando reservas e pagamentos', async () => {
@@ -276,17 +274,14 @@ describe('OrdersService', () => {
         reason: 'Desisti da compra',
       });
 
-      expect(inventoryService.releaseReservations).toHaveBeenCalledWith(
-        expect.anything(),
-        [
-          {
-            productId: 'product-1',
-            name: 'Alface Crespa',
-            sku: 'ALF-001',
-            quantity: 2,
-          },
-        ],
-      );
+      expect(inventoryService.releaseReservations).toHaveBeenCalledWith(expect.anything(), [
+        {
+          productId: 'product-1',
+          name: 'Alface Crespa',
+          sku: 'ALF-001',
+          quantity: 2,
+        },
+      ]);
       expect(prisma.payment.updateMany).toHaveBeenCalledWith({
         where: { orderId: 'order-1', status: 'PENDING' },
         data: { status: 'CANCELLED' },
@@ -306,9 +301,9 @@ describe('OrdersService', () => {
         { id: 'order-1', status: 'PAYMENT_APPROVED', payment_status: 'APPROVED' },
       ]);
 
-      await expect(
-        service.cancelForUser('user-1', 'order-1', {}),
-      ).rejects.toMatchObject({ response: { code: 'ORDER_NOT_CANCELLABLE' } });
+      await expect(service.cancelForUser('user-1', 'order-1', {})).rejects.toMatchObject({
+        response: { code: 'ORDER_NOT_CANCELLABLE' },
+      });
 
       expect(inventoryService.releaseReservations).not.toHaveBeenCalled();
       expect(prisma.order.update).not.toHaveBeenCalled();
@@ -328,9 +323,9 @@ describe('OrdersService', () => {
     it('deve lançar NotFound quando pedido pertence a outro usuário', async () => {
       prisma.$queryRaw.mockResolvedValue([]);
 
-      await expect(
-        service.cancelForUser('user-2', 'order-1', {}),
-      ).rejects.toBeInstanceOf(NotFoundException);
+      await expect(service.cancelForUser('user-2', 'order-1', {})).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
 
       expect(prisma.order.update).not.toHaveBeenCalled();
     });
@@ -379,9 +374,7 @@ describe('OrdersService', () => {
     it('deve somar quantidade ao item já existente no carrinho', async () => {
       prisma.order.findFirst.mockResolvedValue(
         buildOrderRecord({
-          items: [
-            buildOrderRecord().items[0],
-          ],
+          items: [buildOrderRecord().items[0]],
         }),
       );
       prisma.product.findUnique.mockResolvedValue({
@@ -425,9 +418,7 @@ describe('OrdersService', () => {
 
       const result = await service.repeatOrderForUser('user-1', 'order-1');
 
-      expect(result.addedItems).toEqual([
-        { productId: 'product-2', name: 'Rúcula', quantity: 1 },
-      ]);
+      expect(result.addedItems).toEqual([{ productId: 'product-2', name: 'Rúcula', quantity: 1 }]);
       expect(result.skippedItems).toEqual([
         {
           productId: 'product-1',
@@ -483,9 +474,7 @@ describe('OrdersService', () => {
       await expect(service.repeatOrderForUser('user-1', 'order-1')).rejects.toMatchObject({
         response: {
           code: 'REPEAT_ORDER_NO_ITEMS',
-          details: [
-            { field: 'items', message: 'Alface Crespa sem estoque disponível' },
-          ],
+          details: [{ field: 'items', message: 'Alface Crespa sem estoque disponível' }],
         },
       });
     });
@@ -517,9 +506,9 @@ describe('OrdersService', () => {
     it('deve lançar NotFound quando pedido pertence a outro usuário', async () => {
       prisma.order.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.repeatOrderForUser('user-2', 'order-1'),
-      ).rejects.toBeInstanceOf(NotFoundException);
+      await expect(service.repeatOrderForUser('user-2', 'order-1')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
 
       expect(cartService.resolveActiveCart).not.toHaveBeenCalled();
     });
@@ -530,9 +519,7 @@ describe('OrdersService', () => {
 
     beforeEach(() => {
       // Detalhe retornado após a transação (findByIdForAdmin).
-      prisma.order.findUnique.mockResolvedValue(
-        buildOrderRecord({ status: 'PREPARING' }),
-      );
+      prisma.order.findUnique.mockResolvedValue(buildOrderRecord({ status: 'PREPARING' }));
     });
 
     it('deve aplicar transição válida sincronizando entrega e audit log', async () => {
@@ -553,17 +540,39 @@ describe('OrdersService', () => {
         where: { orderId: 'order-1' },
         data: { status: 'PROCESSING' },
       });
-      expect(prisma.auditLog.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
+      expect(audit.record).toHaveBeenCalledWith(
+        expect.objectContaining({
           userId: adminId,
-          action: 'ORDER_STATUS_UPDATED',
+          action: 'ORDER_STATUS_CHANGED',
+          entity: 'Order',
           entityId: 'order-1',
           metadata: { from: 'PAYMENT_APPROVED', to: 'PREPARING', reason: 'Separando itens' },
+          db: prisma,
         }),
-      });
+      );
       // Pagamento aprovado: nada reservado para liberar.
       expect(inventoryService.releaseReservations).not.toHaveBeenCalled();
       expect(result.status).toBe('PREPARING');
+    });
+
+    it('deve propagar o contexto HTTP (ip/user-agent) no registro de auditoria', async () => {
+      prisma.$queryRaw.mockResolvedValue([
+        { id: 'order-1', status: 'READY_FOR_DELIVERY', payment_status: 'APPROVED' },
+      ]);
+
+      await service.updateStatusForAdmin(
+        adminId,
+        'order-1',
+        { status: 'OUT_FOR_DELIVERY' },
+        { userId: adminId, ip: '200.150.10.5', userAgent: 'Mozilla/5.0' },
+      );
+
+      expect(audit.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ip: '200.150.10.5',
+          userAgent: 'Mozilla/5.0',
+        }),
+      );
     });
 
     it('deve liberar reservas ao cancelar pedido não pago', async () => {
@@ -581,17 +590,14 @@ describe('OrdersService', () => {
 
       await service.updateStatusForAdmin(adminId, 'order-1', { status: 'CANCELLED' });
 
-      expect(inventoryService.releaseReservations).toHaveBeenCalledWith(
-        expect.anything(),
-        [
-          {
-            productId: 'product-1',
-            name: 'Alface Crespa',
-            sku: 'ALF-001',
-            quantity: 2,
-          },
-        ],
-      );
+      expect(inventoryService.releaseReservations).toHaveBeenCalledWith(expect.anything(), [
+        {
+          productId: 'product-1',
+          name: 'Alface Crespa',
+          sku: 'ALF-001',
+          quantity: 2,
+        },
+      ]);
       expect(prisma.payment.updateMany).toHaveBeenCalledWith({
         where: { orderId: 'order-1', status: 'PENDING' },
         data: { status: 'CANCELLED' },
@@ -644,7 +650,7 @@ describe('OrdersService', () => {
       });
 
       expect(prisma.order.update).not.toHaveBeenCalled();
-      expect(prisma.auditLog.create).not.toHaveBeenCalled();
+      expect(audit.record).not.toHaveBeenCalled();
     });
 
     it('deve rejeitar quando o pedido já está no status informado', async () => {

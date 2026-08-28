@@ -1,4 +1,10 @@
-import { Injectable, ConflictException, UnauthorizedException, Logger, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  UnauthorizedException,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../database/prisma.service';
@@ -6,6 +12,7 @@ import * as bcrypt from 'bcrypt';
 import { createHash } from 'crypto';
 import type { RegisterDto, LoginDto } from './auth.validation';
 import { NotificationsService } from '../notifications/notifications.service';
+import { AuditService } from '../audit/audit.service';
 
 export interface TokenPayload {
   sub: string;
@@ -37,6 +44,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly notificationsService: NotificationsService,
+    private readonly audit: AuditService,
   ) {}
 
   async register(dto: RegisterDto): Promise<{ user: UserResponse; tokens: AuthTokens }> {
@@ -77,6 +85,14 @@ export class AuthService {
     });
 
     await this.storeRefreshToken(user.id, tokens.refreshToken);
+
+    await this.audit.record({
+      userId: user.id,
+      action: 'USER_CREATED',
+      entity: 'User',
+      entityId: user.id,
+      metadata: { email: user.email, name: user.name, role: user.role },
+    });
 
     this.notificationsService.notify(user.id, 'ACCOUNT_CREATED', {
       userName: user.name,

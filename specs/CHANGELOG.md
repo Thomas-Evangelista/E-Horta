@@ -4,7 +4,82 @@ Registro de modificações do projeto, organizado por fase de implementação.
 
 ---
 
-## Fase 23 — CI/CD e Documentação *(atual)*
+## Fase 24 — Auditoria Completa e Bloqueio de Usuário *(atual)*
+
+**Escopo:** fechar as lacunas de auditoria (spec `24-regras-negocio-fluxos.md` §47
+e `e-horta.md` §47) e adicionar o gerenciamento de status de usuários no admin.
+
+### `AuditService` + `AuditModule` (novo módulo `@Global()`)
+
+- `apps/api/src/modules/audit/audit.service.ts` — registro centralizado de auditoria:
+  - `record({ action, entity, entityId, metadata, userId, ip, userAgent, db? })`.
+  - Aceita um cliente de transação (`db`) para participar do mesmo commit da mutação.
+  - `findAll({ page, limit, action })` — listagem paginada para o painel admin
+    (com o e-mail do usuário via relação com `User`).
+- `AuditContext` (param decorator) em
+  `apps/api/src/common/decorators/audit-context.decorator.ts` — extrai do request o
+  `userId` (autenticado), `ip` e `user-agent`, agora **populados** nos registros
+  (antes as colunas `ip`/`user_agent` nunca eram preenchidas).
+- Registrado em `app.module.ts` e exportado em `common/decorators/index.ts`.
+
+### Novos registros de auditoria (spec §47)
+
+| Ação | Onde | Detalhes |
+|------|------|----------|
+| `PRODUCT_CREATED` | `products.service.ts` `create` | nome, sku, preço, ativo |
+| `PRODUCT_UPDATED` | `products.service.ts` `update` | campos alterados |
+| `PRICE_CHANGED` | `products.service.ts` `update` | `from`/`to` (só se o preço mudou) |
+| `STOCK_CHANGED` | `inventory.service.ts` `updateStock` | quantidade de/para, mínimo |
+| `PROMOTION_CREATED` | `promotions.service.ts` `createPromotion` | código, nome, tipo, valor |
+| `PROMOTION_UPDATED` | `promotions.service.ts` `updatePromotion` | estado `from`/`to` (inclui `isActive`) |
+| `USER_BLOCKED` / `USER_ACTIVATED` / `USER_INACTIVATED` | `users.service.ts` `updateStatusForAdmin` | de/para, e-mail |
+| `USER_DELETED` (refatorado) | `users.service.ts` `deleteAccount` | agora com contexto `ip`/`userAgent` |
+| `USER_CREATED` | `auth.service.ts` `register` | e-mail e perfil do novo usuário |
+| `ORDER_STATUS_CHANGED` | `orders.service.ts` `updateStatusForAdmin` | `from`/`to`, motivo; via transação (`db`) |
+
+Os controllers admin e o controller público de produtos/inventário passam o
+`AuditContext()` do request para os services (antes nenhuma ação de produto,
+estoque ou promoção era auditada). As transições de pedido e o novo registro de
+usuário também publicam eventos de auditoria com `ip`/`userAgent`.
+
+### Listagem de auditoria (novo endpoint)
+
+- `GET /api/v1/admin/audit` (`admin-audit.controller.ts`) — listagem paginada
+  para o painel admin, disponível somente para `ADMIN`.
+  - Query validada por `auditQuerySchema` (`audit.validation.ts`):
+    `page` (padrão 1), `limit` (padrão 50, máx. 100) e `action` (filtro opcional).
+  - Devolve envelope `{ data, meta, error }` com o e-mail do responsável em cada
+    registro.
+
+### Bloqueio/status de usuário no admin (novo endpoint)
+
+- `PATCH /api/v1/admin/users/:id/status` (`admin-users.controller.ts`) — ativa,
+  inativa ou bloqueia um usuário `CUSTOMER`.
+  - Body validado por `updateUserStatusSchema` (`users.validation.ts`).
+  - `users.service.ts updateStatusForAdmin`:
+    - impede alterar o próprio usuário ou perfis `ADMIN`/`OPERATOR`;
+    - grava o registro de auditoria correspondente.
+    - disponível somente para `ADMIN` (guard `@Roles('ADMIN')`).
+
+### Observações
+
+- Fase concluída. Itens planejados para a próxima rodada (fora do escopo atual):
+  observabilidade, promoções no admin, filtros/paginação extras, PWA e
+  acessibilidade.
+- Testes atualizados/adicionados para o novo construtor com `AuditService`:
+  - atualizados: `inventory.service.spec.ts`, `promotions.service.spec.ts`,
+    `promotions.service.admin.spec.ts`, `orders.service.spec.ts`,
+    `auth.service.spec.ts`;
+  - novos: `audit.service.spec.ts` e `users.service.spec.ts`;
+  - integração (`test/app.e2e-spec.ts`): bloco novo cobrindo status de usuário
+    e listagem/filtro da auditoria, incluindo o impedimento de login de usuário
+    bloqueado e o registro com `ip`/`user-agent`.
+- Suíte final: lint 0 erros, typecheck ok nos 3 workspaces, 25 testes de
+  integração + 196 testes unitários passando.
+
+---
+
+## Fase 23 — CI/CD e Documentação
 
 **Escopo:** implementar a pipeline de CI/CD (spec `23-ci-cd-documentacao.md`) e a
 documentação técnica do projeto (README + `docs/`).

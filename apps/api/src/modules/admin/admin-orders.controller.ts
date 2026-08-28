@@ -1,18 +1,24 @@
-import { Controller, Get, Param, Patch, Query, UseGuards, HttpCode, HttpStatus, Body, ParseUUIDPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Query,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+  Body,
+  ParseUUIDPipe,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { OrdersService } from '../orders/orders.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
-import { Roles, CurrentUser } from '../../common/decorators';
+import { Roles, CurrentUser, AuditContext } from '../../common/decorators';
+import type { AuditContext as AuditContextType } from '../audit/audit.service';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
-import {
-  adminOrdersQuerySchema,
-  updateOrderStatusSchema,
-} from '../orders/orders.validation';
-import type {
-  AdminOrdersQueryDto,
-  UpdateOrderStatusDto,
-} from '../orders/orders.validation';
+import { adminOrdersQuerySchema, updateOrderStatusSchema } from '../orders/orders.validation';
+import type { AdminOrdersQueryDto, UpdateOrderStatusDto } from '../orders/orders.validation';
 
 @ApiTags('Admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -42,9 +48,10 @@ export class AdminOrdersController {
   async updateStatus(
     @CurrentUser() admin: { id: string },
     @Param('id', ParseUUIDPipe) id: string,
+    @AuditContext() ctx: AuditContextType,
     @Body(new ZodValidationPipe(updateOrderStatusSchema)) body: UpdateOrderStatusDto,
   ) {
-    const result = await this.ordersService.updateStatusForAdmin(admin.id, id, body);
+    const result = await this.ordersService.updateStatusForAdmin(admin.id, id, body, ctx);
     return { data: result, meta: {}, error: null };
   }
 }

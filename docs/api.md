@@ -198,6 +198,8 @@ processar o mesmo evento duas vezes.
 | PATCH  | `/api/v1/admin/promotions/:id`      | Admin |
 | DELETE | `/api/v1/admin/promotions/:id`      | Admin |
 | GET    | `/api/v1/admin/users`               | Admin |
+| PATCH  | `/api/v1/admin/users/:id/status`    | Admin |
+| GET    | `/api/v1/admin/audit`               | Admin |
 | GET    | `/api/v1/admin/reviews`             | Admin |
 | PATCH  | `/api/v1/admin/reviews/:id/status`  | Admin |
 

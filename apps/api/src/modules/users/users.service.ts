@@ -1,5 +1,6 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { AuditService, type AuditContext } from '../audit/audit.service';
 import type { UserRole, UserStatus } from '@prisma/client';
 
 export interface UserProfile {
@@ -17,7 +18,10 @@ export interface UserProfile {
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+  ) {}
 
   async getProfile(userId: string): Promise<UserProfile> {
     const user = await this.prisma.user.findUnique({
@@ -72,7 +76,7 @@ export class UsersService {
     return updated;
   }
 
-  async deleteAccount(userId: string): Promise<void> {
+  async deleteAccount(userId: string, ctx?: AuditContext): Promise<void> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
@@ -82,20 +86,90 @@ export class UsersService {
     }
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.auditLog.create({
-        data: {
-          userId,
-          action: 'USER_DELETED',
-          entity: 'User',
-          entityId: userId,
-          metadata: { email: user.email, deletedAt: new Date().toISOString() },
-        },
+      await this.audit.record({
+        ...ctx,
+        userId: ctx?.userId ?? userId,
+        action: 'USER_DELETED',
+        entity: 'User',
+        entityId: userId,
+        metadata: { email: user.email, deletedAt: new Date().toISOString() },
+        db: tx,
       });
 
       await tx.user.delete({ where: { id: userId } });
     });
 
     this.logger.log(`User account deleted (LGPD): ${userId}`);
+  }
+
+  /**
+   * Atualização de status de usuário pelo admin (ativar/inativar/bloquear).
+   * Impede bloquear a si mesmo ou outros admins/operadores para evitar lockout.
+   * Registra auditoria (spec §47 — USER_BLOCKED/USER_ACTIVATED/USER_INACTIVATED).
+   */
+  async updateStatusForAdmin(
+    adminUserId: string,
+    targetUserId: string,
+    status: UserStatus,
+    ctx?: AuditContext,
+  ): Promise<UserProfile> {
+    if (adminUserId === targetUserId) {
+      throw new BadRequestException('Não é possível alterar o status do seu próprio usuário');
+    }
+
+    const target = await this.prisma.user.findUnique({
+      where: { id: targetUserId },
+    });
+
+    if (!target) {
+      throw new NotFoundException('Usuário não encontrado');
+    }
+
+    if (target.role !== 'CUSTOMER') {
+      throw new BadRequestException('Não é possível alterar o status de perfis administrativos');
+    }
+
+    if (target.status === status) {
+      throw new BadRequestException(`Usuário já está com o status ${status}`);
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id: targetUserId },
+      data: { status },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        role: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    const action =
+      status === 'BLOCKED'
+        ? 'USER_BLOCKED'
+        : status === 'ACTIVE'
+          ? 'USER_ACTIVATED'
+          : 'USER_INACTIVATED';
+
+    await this.audit.record({
+      ...ctx,
+      userId: adminUserId,
+      action,
+      entity: 'User',
+      entityId: targetUserId,
+      metadata: {
+        from: target.status,
+        to: status,
+        email: target.email,
+      },
+    });
+
+    this.logger.log(`User ${targetUserId} status changed to ${status} by admin ${adminUserId}`);
+    return updated;
   }
 
   /** Listagem administrativa de usuários (nunca expõe passwordHash). */
@@ -107,7 +181,10 @@ export class UsersService {
       role?: UserRole;
       status?: UserStatus;
     } = {},
-  ): Promise<{ users: UserProfile[]; meta: { page: number; limit: number; total: number; totalPages: number } }> {
+  ): Promise<{
+    users: UserProfile[];
+    meta: { page: number; limit: number; total: number; totalPages: number };
+  }> {
     const safeLimit = Math.min(Math.max(1, filters.limit ?? 20), 100);
     const safePage = Math.max(1, filters.page ?? 1);
 

@@ -1,15 +1,12 @@
 import { Test } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import {
-  ConflictException,
-  NotFoundException,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { ConflictException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { AuthService, type AuthTokens } from './auth.service';
 import { PrismaService } from '../../database/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { AuditService } from '../audit/audit.service';
 
 jest.mock('bcrypt', () => ({
   hash: jest.fn().mockResolvedValue('hash-bcrypt'),
@@ -28,6 +25,7 @@ describe('AuthService', () => {
   let jwtService: { signAsync: jest.Mock; verify: jest.Mock };
   let configValues: Record<string, string | undefined>;
   let notificationsService: { notify: jest.Mock };
+  let audit: { record: jest.Mock };
 
   const userRow = {
     id: '11111111-1111-4111-8111-111111111111',
@@ -70,6 +68,8 @@ describe('AuthService', () => {
 
     notificationsService = { notify: jest.fn() };
 
+    audit = { record: jest.fn().mockResolvedValue(undefined) };
+
     const moduleRef = await Test.createTestingModule({
       providers: [
         AuthService,
@@ -82,6 +82,7 @@ describe('AuthService', () => {
           },
         },
         { provide: NotificationsService, useValue: notificationsService },
+        { provide: AuditService, useValue: audit },
       ],
     }).compile();
 
@@ -96,7 +97,7 @@ describe('AuthService', () => {
       confirmPassword: 'SenhaForte123!',
     };
 
-    it('deve criar usuário, gerar tokens e notificar ACCOUNT_CREATED', async () => {
+    it('deve criar usuário, gerar tokens, auditar USER_CREATED e notificar ACCOUNT_CREATED', async () => {
       prisma.user.findUnique.mockResolvedValue(null);
 
       const result = await service.register(dto);
@@ -113,6 +114,14 @@ describe('AuthService', () => {
         }),
       );
       expect(result.tokens).toEqual(tokens);
+      expect(audit.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'USER_CREATED',
+          entity: 'User',
+          entityId: '11111111-1111-4111-8111-111111111111',
+          metadata: expect.objectContaining({ email: 'joao@example.com' }),
+        }),
+      );
       expect(notificationsService.notify).toHaveBeenCalledWith(
         '11111111-1111-4111-8111-111111111111',
         'ACCOUNT_CREATED',
@@ -134,9 +143,9 @@ describe('AuthService', () => {
         return null;
       });
 
-      await expect(
-        service.register({ ...dto, phone: '11999999999' }),
-      ).rejects.toBeInstanceOf(ConflictException);
+      await expect(service.register({ ...dto, phone: '11999999999' })).rejects.toBeInstanceOf(
+        ConflictException,
+      );
     });
   });
 
@@ -223,13 +232,8 @@ describe('AuthService', () => {
     it('deve apagar os refresh tokens do usuário', async () => {
       await service.logout(userRow.id);
 
-      expect(prisma.$executeRaw).toHaveBeenCalledWith(
-        expect.anything(),
-        userRow.id,
-      );
-      expect(String(prisma.$executeRaw.mock.calls[0][0])).toContain(
-        'DELETE FROM refresh_tokens',
-      );
+      expect(prisma.$executeRaw).toHaveBeenCalledWith(expect.anything(), userRow.id);
+      expect(String(prisma.$executeRaw.mock.calls[0][0])).toContain('DELETE FROM refresh_tokens');
     });
   });
 

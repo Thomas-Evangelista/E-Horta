@@ -1,9 +1,16 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+  Logger,
+} from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { Prisma, type OrderStatus, type PaymentStatus, type ShippingStatus } from '@prisma/client';
 import { InventoryService } from '../inventory/inventory.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CartService, type CartResponse } from '../cart/cart.service';
+import { AuditService, type AuditContext } from '../audit/audit.service';
 import {
   isCustomerCancellable,
   isValidTransition,
@@ -124,13 +131,17 @@ export class OrdersService {
     private readonly inventoryService: InventoryService,
     private readonly cartService: CartService,
     private readonly notificationsService: NotificationsService,
+    private readonly audit: AuditService,
   ) {}
 
   async findAllByUser(
     userId: string,
     page = 1,
     limit = 20,
-  ): Promise<{ orders: OrderSummary[]; meta: { page: number; limit: number; total: number; totalPages: number } }> {
+  ): Promise<{
+    orders: OrderSummary[];
+    meta: { page: number; limit: number; total: number; totalPages: number };
+  }> {
     const safeLimit = Math.min(Math.max(1, limit), 100);
     const safePage = Math.max(1, page);
 
@@ -418,7 +429,9 @@ export class OrdersService {
     };
   }
 
-  private getAvailableStock(inventory: { quantity: number; reservedQuantity: number } | null): number {
+  private getAvailableStock(
+    inventory: { quantity: number; reservedQuantity: number } | null,
+  ): number {
     if (!inventory) {
       return 0;
     }
@@ -431,7 +444,10 @@ export class OrdersService {
 
   async findAllForAdmin(
     filters: { page?: number; limit?: number; status?: OrderStatus; search?: string } = {},
-  ): Promise<{ orders: AdminOrderSummary[]; meta: { page: number; limit: number; total: number; totalPages: number } }> {
+  ): Promise<{
+    orders: AdminOrderSummary[];
+    meta: { page: number; limit: number; total: number; totalPages: number };
+  }> {
     const safeLimit = Math.min(Math.max(1, filters.limit ?? 20), 100);
     const safePage = Math.max(1, filters.page ?? 1);
 
@@ -572,6 +588,7 @@ export class OrdersService {
     adminUserId: string,
     orderId: string,
     dto: UpdateOrderStatusDto,
+    ctx?: AuditContext,
   ): Promise<AdminOrderDetail> {
     // Capturados dentro da transação para notificar após o commit.
     let updatedUserId = '';
@@ -610,10 +627,7 @@ export class OrdersService {
           });
         }
 
-        if (
-          dto.status === 'CANCELLED' &&
-          order.payment_status === 'PENDING'
-        ) {
+        if (dto.status === 'CANCELLED' && order.payment_status === 'PENDING') {
           const items = await tx.orderItem.findMany({
             where: { orderId: order.id },
             select: {
@@ -667,18 +681,18 @@ export class OrdersService {
           });
         }
 
-        await tx.auditLog.create({
-          data: {
-            userId: adminUserId,
-            action: 'ORDER_STATUS_UPDATED',
-            entity: 'order',
-            entityId: order.id,
-            metadata: {
-              from: order.status,
-              to: dto.status,
-              reason: dto.reason ?? null,
-            },
+        await this.audit.record({
+          ...ctx,
+          userId: adminUserId,
+          action: 'ORDER_STATUS_CHANGED',
+          entity: 'Order',
+          entityId: order.id,
+          metadata: {
+            from: order.status,
+            to: dto.status,
+            reason: dto.reason ?? null,
           },
+          db: tx,
         });
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted },
@@ -688,7 +702,9 @@ export class OrdersService {
 
     // Notifica o cliente sobre marcos do pedido (spec #16). Aprovação de
     // pagamento é notificada pelo webhook; cancelamento não tem template.
-    const statusEvents: Partial<Record<OrderStatus, Parameters<NotificationsService['notify']>[1]>> = {
+    const statusEvents: Partial<
+      Record<OrderStatus, Parameters<NotificationsService['notify']>[1]>
+    > = {
       PREPARING: 'ORDER_PREPARING',
       OUT_FOR_DELIVERY: 'ORDER_OUT_FOR_DELIVERY',
       DELIVERED: 'ORDER_DELIVERED',

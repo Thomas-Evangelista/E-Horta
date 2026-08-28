@@ -3,7 +3,8 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PromotionsService } from '../promotions/promotions.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
-import { Roles } from '../../common/decorators';
+import { Roles, AuditContext } from '../../common/decorators';
+import type { AuditContext as AuditContextType } from '../audit/audit.service';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import {
   createPromotionSchema,
@@ -41,8 +42,11 @@ export class AdminPromotionsController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: '[Admin] Criar promoção/cupom' })
-  async create(@Body(new ZodValidationPipe(createPromotionSchema)) body: CreatePromotionDto) {
-    const result = await this.promotionsService.createPromotion(body);
+  async create(
+    @AuditContext() ctx: AuditContextType,
+    @Body(new ZodValidationPipe(createPromotionSchema)) body: CreatePromotionDto,
+  ) {
+    const result = await this.promotionsService.createPromotion(body, ctx);
     return { data: result, meta: {}, error: null };
   }
 
@@ -51,9 +55,10 @@ export class AdminPromotionsController {
   @ApiOperation({ summary: '[Admin] Atualizar promoção (ativar/desativar incluído)' })
   async update(
     @Param('id', ParseUUIDPipe) id: string,
+    @AuditContext() ctx: AuditContextType,
     @Body(new ZodValidationPipe(updatePromotionSchema)) body: UpdatePromotionDto,
   ) {
-    const result = await this.promotionsService.updatePromotion(id, body);
+    const result = await this.promotionsService.updatePromotion(id, body, ctx);
     return { data: result, meta: {}, error: null };
   }
 

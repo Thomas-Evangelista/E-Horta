@@ -11,7 +11,8 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { CurrentUser } from '../../common/decorators';
+import { CurrentUser, AuditContext } from '../../common/decorators';
+import type { AuditContext as AuditContextType } from '../audit/audit.service';
 
 @ApiTags('Users')
 @UseGuards(JwtAuthGuard)
@@ -40,8 +41,11 @@ export class UsersController {
   @Delete('me')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Excluir conta (LGPD)' })
-  async deleteAccount(@CurrentUser() user: { id: string }) {
-    await this.usersService.deleteAccount(user.id);
+  async deleteAccount(
+    @CurrentUser() user: { id: string },
+    @AuditContext() ctx: AuditContextType,
+  ) {
+    await this.usersService.deleteAccount(user.id, ctx);
     return { data: { message: 'Conta excluída com sucesso' }, meta: {}, error: null };
   }
 }

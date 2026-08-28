@@ -16,3 +16,11 @@ export const adminUsersQuerySchema = z.object({
 });
 
 export type AdminUsersQueryDto = z.infer<typeof adminUsersQuerySchema>;
+
+export const updateUserStatusSchema = z.object({
+  status: z.enum(userStatusValues, {
+    errorMap: () => ({ message: 'Status inválido' }),
+  }),
+});
+
+export type UpdateUserStatusDto = z.infer<typeof updateUserStatusSchema>;

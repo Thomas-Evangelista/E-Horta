@@ -3,7 +3,8 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ProductsService } from '../products/products.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
-import { Roles } from '../../common/decorators';
+import { Roles, AuditContext } from '../../common/decorators';
+import type { AuditContext as AuditContextType } from '../audit/audit.service';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import {
   createProductSchema,
@@ -34,8 +35,11 @@ export class AdminProductsController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: '[Admin] Criar produto' })
-  async create(@Body(new ZodValidationPipe(createProductSchema)) body: CreateProductDto) {
-    const result = await this.productsService.create(body);
+  async create(
+    @AuditContext() ctx: AuditContextType,
+    @Body(new ZodValidationPipe(createProductSchema)) body: CreateProductDto,
+  ) {
+    const result = await this.productsService.create({ ...body, ctx });
     return { data: result, meta: {}, error: null };
   }
 
@@ -44,9 +48,10 @@ export class AdminProductsController {
   @ApiOperation({ summary: '[Admin] Atualizar produto (preço, ativo/desativar etc.)' })
   async update(
     @Param('id', ParseUUIDPipe) id: string,
+    @AuditContext() ctx: AuditContextType,
     @Body(new ZodValidationPipe(updateProductSchema)) body: UpdateProductDto,
   ) {
-    const result = await this.productsService.update(id, body);
+    const result = await this.productsService.update(id, { ...body, ctx });
     return { data: result, meta: {}, error: null };
   }
 

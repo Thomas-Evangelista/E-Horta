@@ -1,11 +1,8 @@
 import { Test } from '@nestjs/testing';
-import {
-  BadRequestException,
-  ConflictException,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { InventoryService, type StockOperationItem } from './inventory.service';
 import { PrismaService } from '../../database/prisma.service';
+import { AuditService } from '../audit/audit.service';
 import type { Prisma } from '@prisma/client';
 
 describe('InventoryService', () => {
@@ -14,6 +11,7 @@ describe('InventoryService', () => {
     inventory: { findUnique: jest.Mock; findMany: jest.Mock; update: jest.Mock };
     $executeRaw: jest.Mock;
   };
+  let audit: { record: jest.Mock };
   let tx: Prisma.TransactionClient;
 
   const productId = 'aa000000-0000-4000-8000-000000000001';
@@ -43,10 +41,13 @@ describe('InventoryService', () => {
       $executeRaw: jest.fn().mockResolvedValue(1),
     };
 
+    audit = { record: jest.fn().mockResolvedValue(undefined) };
+
     const moduleRef = await Test.createTestingModule({
       providers: [
         InventoryService,
         { provide: PrismaService, useValue: prisma },
+        { provide: AuditService, useValue: audit },
       ],
     }).compile();
 
@@ -64,9 +65,7 @@ describe('InventoryService', () => {
     it('deve lançar NotFound quando não existe', async () => {
       prisma.inventory.findUnique.mockResolvedValue(null);
 
-      await expect(service.findByProductId(productId)).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
+      await expect(service.findByProductId(productId)).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 
@@ -99,7 +98,7 @@ describe('InventoryService', () => {
   });
 
   describe('updateStock', () => {
-    it('deve atualizar quantidade e mínimo', async () => {
+    it('deve atualizar quantidade e mínimo e registrar auditoria', async () => {
       prisma.inventory.findUnique.mockResolvedValue(inventoryRow);
       prisma.inventory.update.mockResolvedValue({ ...inventoryRow, quantity: 20 });
 
@@ -109,6 +108,37 @@ describe('InventoryService', () => {
         where: { productId },
         data: { quantity: 20, minimumStock: 5 },
       });
+      expect(audit.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'STOCK_CHANGED',
+          entity: 'Inventory',
+          entityId: productId,
+          metadata: expect.objectContaining({
+            fromQuantity: 20,
+            toQuantity: 20,
+            minimumStock: 5,
+          }),
+        }),
+      );
+    });
+
+    it('deve repassar o contexto HTTP para o registro de auditoria', async () => {
+      prisma.inventory.findUnique.mockResolvedValue(inventoryRow);
+      prisma.inventory.update.mockResolvedValue({ ...inventoryRow, quantity: 30 });
+
+      await service.updateStock(
+        productId,
+        { quantity: 30 },
+        { userId: 'admin-1', ip: '10.0.0.1', userAgent: 'jest' },
+      );
+
+      expect(audit.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'admin-1',
+          ip: '10.0.0.1',
+          userAgent: 'jest',
+        }),
+      );
     });
 
     it('deve rejeitar quantidade negativa', async () => {
@@ -142,18 +172,17 @@ describe('InventoryService', () => {
     it('deve lançar OUT_OF_STOCK quando o UPDATE condicional não afeta nenhuma linha', async () => {
       prisma.$executeRaw.mockResolvedValue(0);
 
-      await expect(service.reserveItems(tx, [item])).rejects.toBeInstanceOf(
-        ConflictException,
-      );
+      await expect(service.reserveItems(tx, [item])).rejects.toBeInstanceOf(ConflictException);
     });
 
     it('deve interromper no primeiro item sem estoque', async () => {
-      prisma.$executeRaw
-        .mockResolvedValueOnce(1)
-        .mockResolvedValueOnce(0);
+      prisma.$executeRaw.mockResolvedValueOnce(1).mockResolvedValueOnce(0);
 
       await expect(
-        service.reserveItems(tx, [item, { ...item, productId: 'bb000000-0000-4000-8000-000000000002' }]),
+        service.reserveItems(tx, [
+          item,
+          { ...item, productId: 'bb000000-0000-4000-8000-000000000002' },
+        ]),
       ).rejects.toBeInstanceOf(ConflictException);
       expect(prisma.$executeRaw).toHaveBeenCalledTimes(2);
     });
@@ -173,9 +202,7 @@ describe('InventoryService', () => {
       await service.confirmReductions(tx, [item]);
 
       expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
-      expect(String(prisma.$executeRaw.mock.calls[0][0])).toContain(
-        '"quantity" = "quantity" - ',
-      );
+      expect(String(prisma.$executeRaw.mock.calls[0][0])).toContain('"quantity" = "quantity" - ');
     });
 
     it('deve ignorar (sem lançar) quando a reserva não é encontrada', async () => {

@@ -15,6 +15,7 @@ import { OrdersModule } from '../orders/orders.module';
 import { PromotionsModule } from '../promotions/promotions.module';
 import { ReviewsModule } from '../reviews/reviews.module';
 import { AdminReviewsController } from './admin-reviews.controller';
+import { AdminAuditController } from './admin-audit.controller';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { AdminReviewsController } from './admin-reviews.controller';
     AdminInventoryController,
     AdminPromotionsController,
     AdminReviewsController,
+    AdminAuditController,
   ],
   providers: [AdminService],
 })

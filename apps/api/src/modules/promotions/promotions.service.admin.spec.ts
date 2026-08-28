@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client';
 import { PromotionsService } from './promotions.service';
 import { CartService } from '../cart/cart.service';
 import { PrismaService } from '../../database/prisma.service';
+import { AuditService } from '../audit/audit.service';
 
 const decimal = (value: string) => new Prisma.Decimal(value);
 
@@ -39,6 +40,7 @@ describe('PromotionsService — administração', () => {
     $transaction: jest.Mock;
   };
   let cartService: { resolveActiveCart: jest.Mock };
+  let audit: { record: jest.Mock };
 
   const createDto = {
     code: 'BAIXA20',
@@ -67,11 +69,14 @@ describe('PromotionsService — administração', () => {
       resolveActiveCart: jest.fn(),
     };
 
+    audit = { record: jest.fn().mockResolvedValue(undefined) };
+
     const moduleRef = await Test.createTestingModule({
       providers: [
         PromotionsService,
         { provide: PrismaService, useValue: prisma },
         { provide: CartService, useValue: cartService },
+        { provide: AuditService, useValue: audit },
       ],
     }).compile();
 
@@ -95,20 +100,26 @@ describe('PromotionsService — administração', () => {
       expect(prisma.promotion.create).toHaveBeenCalledWith({
         data: expect.objectContaining({ code: 'BAIXA20', type: 'FIXED', value: 5 }),
       });
+      expect(audit.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'PROMOTION_CREATED',
+          entity: 'Promotion',
+          metadata: expect.objectContaining({ code: 'BAIXA20', type: 'FIXED' }),
+        }),
+      );
     });
 
     it('deve rejeitar código duplicado', async () => {
       prisma.promotion.findUnique.mockResolvedValue(promotionRecord);
 
-      await expect(service.createPromotion(createDto)).rejects.toBeInstanceOf(
-        ConflictException,
-      );
+      await expect(service.createPromotion(createDto)).rejects.toBeInstanceOf(ConflictException);
     });
   });
 
   describe('updatePromotion', () => {
     it('deve desativar promoção', async () => {
       prisma.promotion.findUnique.mockResolvedValue(promotionRecord);
+      prisma.promotion.update.mockResolvedValue({ ...promotionRecord, isActive: false });
 
       const result = await service.updatePromotion('promotion-1', { isActive: false });
 
@@ -117,14 +128,23 @@ describe('PromotionsService — administração', () => {
         data: { isActive: false },
       });
       expect(result).toBeDefined();
+      expect(audit.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'PROMOTION_UPDATED',
+          metadata: expect.objectContaining({
+            from: expect.objectContaining({ isActive: true }),
+            to: expect.objectContaining({ isActive: false }),
+          }),
+        }),
+      );
     });
 
     it('deve rejeitar percentual acima de 100 considerando o tipo atual', async () => {
       prisma.promotion.findUnique.mockResolvedValue(promotionRecord);
 
-      await expect(
-        service.updatePromotion('promotion-1', { value: 120 }),
-      ).rejects.toMatchObject({ response: { code: 'INVALID_PROMOTION' } });
+      await expect(service.updatePromotion('promotion-1', { value: 120 })).rejects.toMatchObject({
+        response: { code: 'INVALID_PROMOTION' },
+      });
 
       expect(prisma.promotion.update).not.toHaveBeenCalled();
     });

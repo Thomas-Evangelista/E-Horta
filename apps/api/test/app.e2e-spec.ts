@@ -6,6 +6,7 @@ import { AppModule } from '../src/app.module';
 import {
   migrateTestDatabase,
   seedTestDatabase,
+  seedAdminUser,
   cleanTestDatabase,
   getTestPrisma,
 } from './test-db.setup';
@@ -309,6 +310,92 @@ describe('Autorização admin (E2E)', () => {
     const { token } = await registerAndLogin(`e2e-cust-${Date.now()}@example.com`);
     const res = await request(app.getHttpServer())
       .get(`${API}/admin/dashboard`)
+      .set(auth(token));
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('Administração: status de usuário e auditoria (E2E)', () => {
+  let adminToken: string;
+  let customerId: string;
+  let customerEmail: string;
+  const customerPassword = 'SenhaForte123!';
+
+  beforeAll(async () => {
+    await seedAdminUser();
+    const login = await request(app.getHttpServer())
+      .post(`${API}/auth/login`)
+      .send({ email: 'admin@ehorta.com.br', password: 'admin123' });
+    adminToken = login.body.data.tokens.accessToken;
+
+    customerEmail = `e2e-audit-${Date.now()}@example.com`;
+    const { userId } = await registerAndLogin(customerEmail);
+    customerId = userId;
+  });
+
+  it('bloqueia um usuário CUSTOMER pelo admin', async () => {
+    const res = await request(app.getHttpServer())
+      .patch(`${API}/admin/users/${customerId}/status`)
+      .set(auth(adminToken))
+      .send({ status: 'BLOCKED' });
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('BLOCKED');
+  });
+
+  it('impede bloquear o próprio admin', async () => {
+    const me = await request(app.getHttpServer()).get(`${API}/auth/me`).set(auth(adminToken));
+    const adminUserId = me.body.data.id;
+
+    const res = await request(app.getHttpServer())
+      .patch(`${API}/admin/users/${adminUserId}/status`)
+      .set(auth(adminToken))
+      .send({ status: 'INACTIVE' });
+    expect(res.status).toBe(400);
+  });
+
+  it('impede o login do usuário bloqueado', async () => {
+    const login = await request(app.getHttpServer())
+      .post(`${API}/auth/login`)
+      .send({ email: customerEmail, password: customerPassword });
+    expect(login.status).toBe(401);
+  });
+
+  it('lista auditoria com o e-mail do responsável', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`${API}/admin/audit?limit=50`)
+      .set(auth(adminToken));
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+
+    const userBlocked = (res.body.data as Array<{
+      action: string;
+      entityId: string;
+      userEmail: string | null;
+      ip: string | null;
+      metadata: { email?: string };
+    }>).find((row) => row.action === 'USER_BLOCKED' && row.entityId === customerId);
+    expect(userBlocked).toBeTruthy();
+    // userId/userEmail apontam para o responsável (o admin que bloqueou).
+    expect(userBlocked?.userEmail).toBe('admin@ehorta.com.br');
+    // O e-mail do alvo fica nos metadados.
+    expect(userBlocked?.metadata.email).toContain('e2e-audit-');
+    // Registros originados de request devem carregar ip/user-agent.
+    expect(userBlocked?.ip).toBeTruthy();
+  });
+
+  it('filtra a auditoria por ação', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`${API}/admin/audit?action=USER_CREATED`)
+      .set(auth(adminToken));
+    expect(res.status).toBe(200);
+    const actions = new Set((res.body.data as Array<{ action: string }>).map((r) => r.action));
+    expect(actions).toEqual(new Set(['USER_CREATED']));
+  });
+
+  it('rejeita acesso a /admin/audit por cliente comum', async () => {
+    const { token } = await registerAndLogin(`e2e-nonaudit-${Date.now()}@example.com`);
+    const res = await request(app.getHttpServer())
+      .get(`${API}/admin/audit`)
       .set(auth(token));
     expect(res.status).toBe(403);
   });

@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, ConflictException, Logger } from '@nestjs/common';
 import { Prisma, type PromotionType } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
+import { AuditService, type AuditContext } from '../audit/audit.service';
 import { CartService, type CartOwner, type CartResponse } from '../cart/cart.service';
 import { findPromotionIneligibility, getIneligibilityMessage } from '../../common/utils/promotion-calculator';
 import type {
@@ -33,6 +34,7 @@ export class PromotionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cartService: CartService,
+    private readonly audit: AuditService,
   ) {}
 
   async applyCoupon(owner: CartOwner, dto: ApplyCouponDto): Promise<CartResponse> {
@@ -124,7 +126,7 @@ export class PromotionsService {
     return this.toAdminView(promotion);
   }
 
-  async createPromotion(data: CreatePromotionDto): Promise<AdminPromotionView> {
+  async createPromotion(data: CreatePromotionDto, ctx?: AuditContext): Promise<AdminPromotionView> {
     await this.assertCodeAvailable(data.code);
 
     const promotion = await this.prisma.promotion.create({
@@ -142,11 +144,24 @@ export class PromotionsService {
       },
     });
 
+    await this.audit.record({
+      ...ctx,
+      action: 'PROMOTION_CREATED',
+      entity: 'Promotion',
+      entityId: promotion.id,
+      metadata: {
+        code: promotion.code,
+        name: promotion.name,
+        type: promotion.type,
+        value: promotion.value.toNumber(),
+      },
+    });
+
     this.logger.log(`Promotion created: ${promotion.code} (${promotion.id})`);
     return this.toAdminView(promotion);
   }
 
-  async updatePromotion(id: string, data: UpdatePromotionDto): Promise<AdminPromotionView> {
+  async updatePromotion(id: string, data: UpdatePromotionDto, ctx?: AuditContext): Promise<AdminPromotionView> {
     const existing = await this.prisma.promotion.findUnique({
       where: { id },
     });
@@ -199,6 +214,26 @@ export class PromotionsService {
         ...(data.endsAt !== undefined && { endsAt: data.endsAt }),
         ...(data.usageLimit !== undefined && { usageLimit: data.usageLimit }),
         ...(data.isActive !== undefined && { isActive: data.isActive }),
+      },
+    });
+
+    await this.audit.record({
+      ...ctx,
+      action: 'PROMOTION_UPDATED',
+      entity: 'Promotion',
+      entityId: id,
+      metadata: {
+        code: updated.code,
+        from: {
+          code: existing.code,
+          value: existing.value.toNumber(),
+          isActive: existing.isActive,
+        },
+        to: {
+          code: updated.code,
+          value: updated.value.toNumber(),
+          isActive: updated.isActive,
+        },
       },
     });
 

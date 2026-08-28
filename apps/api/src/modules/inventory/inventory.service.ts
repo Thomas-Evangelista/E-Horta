@@ -7,6 +7,10 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { Prisma, type Inventory } from '@prisma/client';
+import {
+  AuditService,
+  type AuditContext,
+} from '../audit/audit.service';
 
 export interface StockOperationItem {
   productId: string;
@@ -19,7 +23,10 @@ export interface StockOperationItem {
 export class InventoryService {
   private readonly logger = new Logger(InventoryService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+  ) {}
 
   async findByProductId(productId: string): Promise<Inventory> {
     const inventory = await this.prisma.inventory.findUnique({
@@ -82,6 +89,7 @@ export class InventoryService {
       quantity?: number;
       minimumStock?: number;
     },
+    ctx?: AuditContext,
   ): Promise<Inventory> {
     await this.findByProductId(productId);
 
@@ -94,6 +102,20 @@ export class InventoryService {
       data: {
         ...(data.quantity !== undefined && { quantity: data.quantity }),
         ...(data.minimumStock !== undefined && { minimumStock: data.minimumStock }),
+      },
+    });
+
+    await this.audit.record({
+      ...ctx,
+      action: 'STOCK_CHANGED',
+      entity: 'Inventory',
+      entityId: productId,
+      metadata: {
+        fromQuantity: updated.quantity,
+        toQuantity: data.quantity ?? updated.quantity,
+        ...(data.minimumStock !== undefined && {
+          minimumStock: data.minimumStock,
+        }),
       },
     });
 

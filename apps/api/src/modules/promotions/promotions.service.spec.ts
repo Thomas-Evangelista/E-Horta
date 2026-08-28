@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PromotionsService } from './promotions.service';
 import { CartService } from '../cart/cart.service';
 import { PrismaService } from '../../database/prisma.service';
+import { AuditService } from '../audit/audit.service';
 import { applyCouponSchema } from './promotions.validation';
 
 describe('PromotionsService', () => {
@@ -53,6 +54,7 @@ describe('PromotionsService', () => {
         PromotionsService,
         { provide: PrismaService, useValue: prisma },
         { provide: CartService, useValue: cartService },
+        { provide: AuditService, useValue: { record: jest.fn().mockResolvedValue(undefined) } },
       ],
     }).compile();
 
@@ -95,14 +97,8 @@ describe('PromotionsService', () => {
     it.each([
       ['PROMOTION_INACTIVE', makePromotion({ isActive: false })],
       ['PROMOTION_EXPIRED', makePromotion({ endsAt: new Date('2020-01-01T00:00:00Z') })],
-      [
-        'PROMOTION_USAGE_LIMIT',
-        makePromotion({ usageLimit: 10, usageCount: 10 }),
-      ],
-      [
-        'MINIMUM_ORDER_VALUE',
-        makePromotion({ minimumOrderValue: new Prisma.Decimal(100) }),
-      ],
+      ['PROMOTION_USAGE_LIMIT', makePromotion({ usageLimit: 10, usageCount: 10 })],
+      ['MINIMUM_ORDER_VALUE', makePromotion({ minimumOrderValue: new Prisma.Decimal(100) })],
     ])('deve bloquear cupom inválido (%s)', async (expectedCode, promotion) => {
       prisma.promotion.findUnique.mockResolvedValue(promotion);
 
