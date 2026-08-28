@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Suspense } from 'react';
 import { BottomNav } from '@/components/layout/bottom-nav';
 import { Header } from '@/components/layout/header';
+import { ServiceWorkerRegister } from '@/components/pwa/service-worker-register';
 import { Providers } from './providers';
 import { siteUrl } from '@/lib/seo';
 import './globals.css';
@@ -15,6 +16,16 @@ export const metadata: Metadata = {
   description:
     'Compre hortaliças, frutas e legumes frescos com entrega rápida. Do campo pra sua casa.',
   applicationName: 'E-Horta',
+  icons: {
+    icon: '/icons/icon.svg',
+    apple: '/icons/icon-192.png',
+    shortcut: '/icons/icon.svg',
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'E-Horta',
+  },
   openGraph: {
     type: 'website',
     siteName: 'E-Horta',
@@ -33,6 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="pt-BR">
       <body className="min-h-dvh">
+        <ServiceWorkerRegister />
         <Providers>
           <Suspense>
             <Header />
