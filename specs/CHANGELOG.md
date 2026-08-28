@@ -4,7 +4,65 @@ Registro de modificações do projeto, organizado por fase de implementação.
 
 ---
 
-## Fase 24 — Auditoria Completa e Bloqueio de Usuário *(atual)*
+## Fase 25 — Observabilidade *(atual)*
+
+**Escopo:** instrumentação do backend (item planejado na Fase 24): correlação de
+requisições, logging estruturado, métricas no formato Prometheus e healthcheck
+por dependência. Sem dependências novas (registry próprio + `ioredis` já
+utilizado).
+
+### Novo módulo `observability` (`apps/api/src/modules/observability/`)
+
+- **Request-id** (`request-id.middleware.ts` + `request-context.ts`):
+  - Middleware global: aceita `X-Request-Id` do cliente (primeiro segmento) ou
+    gera UUID, devolve o mesmo valor no header de resposta e publica o contexto
+    (`requestId`, `ip`, `method`, `url`) via `AsyncLocalStorage` por toda a
+    requisição.
+- **Logging estruturado** (`structured.logger.ts` + `logging.interceptor.ts`):
+  - Em produção (`NODE_ENV=production`) cada linha de log é um JSON com
+    `{ level, timestamp, pid, context, requestId, message }` no stdout; em dev,
+    texto legível.
+  - Interceptor global: uma linha por requisição com `requestId`, método, rota,
+    status, duração (ms) e `userId` quando autenticado (capturado nos eventos
+    `finish`/`close` da resposta, refletindo o status final incl. erros).
+- **Métricas** (`metrics.service.ts` + `metrics.controller.ts`) — registry
+  próprio no formato de exposição do Prometheus (text 0.0.4), sem libs externas:
+  - `GET /api/v1/metrics` (público): `http_requests_total{method,route,status}`
+    e histograma `http_request_duration_seconds{method}`; o scrape do
+    `/metrics` **não** alimenta as próprias métricas.
+  - Gauges de processo: `nodejs_heap_bytes`, `nodejs_heap_total_bytes`,
+    `nodejs_rss_bytes`, `nodejs_uptime_seconds`, `process_start_time_seconds`.
+  - Gauges de dependência: `ehorta_database_up` e `ehorta_redis_up`
+    (atualizados pelo healthcheck).
+
+### Healthcheck por dependência
+
+- `health.service.ts` agora inclui **Redis** (cliente descartável de
+  `checkRedis`, com `lazyConnect`, timeout curto e desconexão garantida) além de
+  banco e memória; `/health` retorna `checks.database|redis|memory` com latência
+  e `/ready` verifica banco **e** Redis.
+
+### Wiring
+
+- `observability.module.ts` registra o middleware e o interceptor globalmente
+  (`APP_INTERCEPTOR`) e exporta `MetricsService` (consumido pelo `HealthModule`).
+- `main.ts` aplica `app.useLogger(new StructuredLogger(...))` — JSON em
+  produção, texto em dev.
+
+### Testes
+
+- Novos: `metrics.service.spec.ts`, `logging.interceptor.spec.ts`,
+  `request-id.middleware.spec.ts`, `structured.logger.spec.ts`,
+  `health.service.spec.ts` (com `ioredis` mockado).
+- Integração (`test/app.e2e-spec.ts`): bloco **Saúde e observabilidade** —
+  `/health` com redis, `/metrics` no formato Prometheus sem autenticação,
+  propagação e geração de `X-Request-Id`.
+- Suíte final: lint 0 erros, typecheck ok nos 3 workspaces, 29 testes de
+  integração + 218 testes unitários passando, `nest build` ok.
+
+---
+
+## Fase 24 — Auditoria Completa e Bloqueio de Usuário
 
 **Escopo:** fechar as lacunas de auditoria (spec `24-regras-negocio-fluxos.md` §47
 e `e-horta.md` §47) e adicionar o gerenciamento de status de usuários no admin.

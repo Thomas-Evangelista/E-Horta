@@ -4,12 +4,17 @@ import { ConfigService } from '@nestjs/config';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { StructuredLogger } from './modules/observability/structured.logger';
 
 async function bootstrap() {
   // rawBody é necessário para validar a assinatura HMAC dos webhooks.
   const app = await NestFactory.create(AppModule, { rawBody: true });
   const configService = app.get(ConfigService);
   const logger = new Logger('Bootstrap');
+  const isProduction = configService.get<string>('NODE_ENV') === 'production';
+
+  // Logging estruturado: JSON em produção (para coleta centralizada), texto em dev.
+  app.useLogger(new StructuredLogger({ pretty: !isProduction }));
 
   app.use(helmet());
 
@@ -30,8 +35,6 @@ async function bootstrap() {
       },
     }),
   );
-
-  const isProduction = configService.get<string>('NODE_ENV') === 'production';
 
   if (!isProduction) {
     const config = new DocumentBuilder()

@@ -57,6 +57,8 @@ Organizado por **módulos funcionais** em `apps/api/src/modules`:
 - `admin/*` — painel administrativo (dashboard, produtos, categorias, estoque,
   pedidos, promoções, usuários, avaliações)
 - `health` — health checks (`/health` e `/ready`)
+- `observability` — request-id, logging estruturado e métricas Prometheus
+  (`/metrics`)
 
 ### Infraestrutura técnica da API
 
@@ -70,6 +72,12 @@ Organizado por **módulos funcionais** em `apps/api/src/modules`:
 - **Autorização**: todo endpoint administrativo é protegido no backend
   (Regra 8 da Fase 24).
 - **Fila**: BullMQ + Redis para notificações.
+- **Observabilidade**: middleware de request-id (`X-Request-Id` via
+  `AsyncLocalStorage`) + interceptor global de telemetria (log estruturado com
+  rota/status/duração/usuário e métricas `http_requests_total` e
+  `http_request_duration_seconds`), registry próprio no formato de exposição do
+  Prometheus exposto em `/metrics`, healthcheck por dependência (banco, Redis,
+  memória) e logger JSON em produção.
 
 ### Padrão de camadas
 

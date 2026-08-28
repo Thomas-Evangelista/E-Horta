@@ -39,14 +39,12 @@ async function createTestApp(): Promise<INestApplication> {
 
 async function registerAndLogin(email: string): Promise<AuthResult> {
   const password = 'SenhaForte123!';
-  const register = await request(app.getHttpServer())
-    .post(`${API}/auth/register`)
-    .send({
-      name: 'Usuário Teste',
-      email,
-      password,
-      confirmPassword: password,
-    });
+  const register = await request(app.getHttpServer()).post(`${API}/auth/register`).send({
+    name: 'Usuário Teste',
+    email,
+    password,
+    confirmPassword: password,
+  });
   expect(register.status).toBe(201);
 
   const { data } = register.body;
@@ -85,7 +83,12 @@ describe('Auth — register/login/refresh/logout (E2E)', () => {
   it('registra um novo usuário', async () => {
     const res = await request(app.getHttpServer())
       .post(`${API}/auth/register`)
-      .send({ name: 'Auth Teste', email, password: 'SenhaForte123!', confirmPassword: 'SenhaForte123!' });
+      .send({
+        name: 'Auth Teste',
+        email,
+        password: 'SenhaForte123!',
+        confirmPassword: 'SenhaForte123!',
+      });
     expect(res.status).toBe(201);
     expect(res.body.data.user.email).toBe(email);
     expect(res.body.data.tokens.accessToken).toBeTruthy();
@@ -95,7 +98,12 @@ describe('Auth — register/login/refresh/logout (E2E)', () => {
   it('rejeita e-mail duplicado', async () => {
     const res = await request(app.getHttpServer())
       .post(`${API}/auth/register`)
-      .send({ name: 'Auth Teste', email, password: 'SenhaForte123!', confirmPassword: 'SenhaForte123!' });
+      .send({
+        name: 'Auth Teste',
+        email,
+        password: 'SenhaForte123!',
+        confirmPassword: 'SenhaForte123!',
+      });
     expect(res.status).toBe(409);
   });
 
@@ -115,9 +123,7 @@ describe('Auth — register/login/refresh/logout (E2E)', () => {
   });
 
   it('acessa /me com o token', async () => {
-    const res = await request(app.getHttpServer())
-      .get(`${API}/auth/me`)
-      .set(auth(token));
+    const res = await request(app.getHttpServer()).get(`${API}/auth/me`).set(auth(token));
     expect(res.status).toBe(200);
     expect(res.body.data.email).toBe(email);
   });
@@ -133,9 +139,7 @@ describe('Auth — register/login/refresh/logout (E2E)', () => {
       .send({ email, password: 'SenhaForte123!' });
     const refreshToken = login.body.data.tokens.refreshToken;
 
-    await request(app.getHttpServer())
-      .post(`${API}/auth/logout`)
-      .set(auth(token));
+    await request(app.getHttpServer()).post(`${API}/auth/logout`).set(auth(token));
 
     const refresh = await request(app.getHttpServer())
       .post(`${API}/auth/refresh`)
@@ -221,26 +225,21 @@ describe('Checkout completo: endereço → frete → checkout → pagamento → 
   });
 
   it('cria endereço', async () => {
-    const res = await request(app.getHttpServer())
-      .post(`${API}/addresses`)
-      .set(auth(token))
-      .send({
-        zipCode: '01310100',
-        street: 'Av. Paulista',
-        number: '100',
-        neighborhood: 'Bela Vista',
-        city: 'São Paulo',
-        state: 'SP',
-        isDefault: true,
-      });
+    const res = await request(app.getHttpServer()).post(`${API}/addresses`).set(auth(token)).send({
+      zipCode: '01310100',
+      street: 'Av. Paulista',
+      number: '100',
+      neighborhood: 'Bela Vista',
+      city: 'São Paulo',
+      state: 'SP',
+      isDefault: true,
+    });
     expect(res.status).toBe(201);
     expect(res.body.data.id).toBeTruthy();
   });
 
   it('calcula opções de frete', async () => {
-    const addresses = await request(app.getHttpServer())
-      .get(`${API}/addresses`)
-      .set(auth(token));
+    const addresses = await request(app.getHttpServer()).get(`${API}/addresses`).set(auth(token));
     const addressId = addresses.body.data[0].id;
 
     const res = await request(app.getHttpServer())
@@ -253,9 +252,7 @@ describe('Checkout completo: endereço → frete → checkout → pagamento → 
   });
 
   it('cria o pedido no checkout (PIX) e baixa estoque', async () => {
-    const addresses = await request(app.getHttpServer())
-      .get(`${API}/addresses`)
-      .set(auth(token));
+    const addresses = await request(app.getHttpServer()).get(`${API}/addresses`).set(auth(token));
     const addressId = addresses.body.data[0].id;
 
     const before = await prisma.inventory.findUniqueOrThrow({ where: { productId } });
@@ -274,9 +271,7 @@ describe('Checkout completo: endereço → frete → checkout → pagamento → 
   });
 
   it('aprova o pagamento via sandbox e move o pedido para PAYMENT_APPROVED', async () => {
-    const orders = await request(app.getHttpServer())
-      .get(`${API}/orders`)
-      .set(auth(token));
+    const orders = await request(app.getHttpServer()).get(`${API}/orders`).set(auth(token));
     const orderId = orders.body.data[0].id;
 
     const payment = await request(app.getHttpServer())
@@ -308,9 +303,7 @@ describe('Checkout completo: endereço → frete → checkout → pagamento → 
 describe('Autorização admin (E2E)', () => {
   it('nega acesso admin a cliente', async () => {
     const { token } = await registerAndLogin(`e2e-cust-${Date.now()}@example.com`);
-    const res = await request(app.getHttpServer())
-      .get(`${API}/admin/dashboard`)
-      .set(auth(token));
+    const res = await request(app.getHttpServer()).get(`${API}/admin/dashboard`).set(auth(token));
     expect(res.status).toBe(403);
   });
 });
@@ -367,13 +360,15 @@ describe('Administração: status de usuário e auditoria (E2E)', () => {
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body.data)).toBe(true);
 
-    const userBlocked = (res.body.data as Array<{
-      action: string;
-      entityId: string;
-      userEmail: string | null;
-      ip: string | null;
-      metadata: { email?: string };
-    }>).find((row) => row.action === 'USER_BLOCKED' && row.entityId === customerId);
+    const userBlocked = (
+      res.body.data as Array<{
+        action: string;
+        entityId: string;
+        userEmail: string | null;
+        ip: string | null;
+        metadata: { email?: string };
+      }>
+    ).find((row) => row.action === 'USER_BLOCKED' && row.entityId === customerId);
     expect(userBlocked).toBeTruthy();
     // userId/userEmail apontam para o responsável (o admin que bloqueou).
     expect(userBlocked?.userEmail).toBe('admin@ehorta.com.br');
@@ -394,9 +389,38 @@ describe('Administração: status de usuário e auditoria (E2E)', () => {
 
   it('rejeita acesso a /admin/audit por cliente comum', async () => {
     const { token } = await registerAndLogin(`e2e-nonaudit-${Date.now()}@example.com`);
-    const res = await request(app.getHttpServer())
-      .get(`${API}/admin/audit`)
-      .set(auth(token));
+    const res = await request(app.getHttpServer()).get(`${API}/admin/audit`).set(auth(token));
     expect(res.status).toBe(403);
+  });
+});
+
+describe('Saúde e observabilidade (E2E)', () => {
+  it('expoõe /health com status geral e checagens', async () => {
+    const res = await request(app.getHttpServer()).get(`${API}/health`);
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('ok');
+    expect(res.body.checks.database.status).toBe('ok');
+    expect(res.body.checks.redis.status).toBe('ok');
+  });
+
+  it('expoõe /metrics no formato Prometheus, sem autenticação', async () => {
+    const res = await request(app.getHttpServer()).get(`${API}/metrics`);
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('text/plain');
+    expect(res.text).toContain('# TYPE http_requests_total counter');
+    expect(res.text).toContain('ehorta_database_up 1');
+    expect(res.text).toContain('ehorta_redis_up 1');
+  });
+
+  it('propaga o X-Request-Id recebido na resposta', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`${API}/metrics`)
+      .set('X-Request-Id', 'e2e-trace-123');
+    expect(res.headers['x-request-id']).toBe('e2e-trace-123');
+  });
+
+  it('gera um X-Request-Id quando o cliente não envia', async () => {
+    const res = await request(app.getHttpServer()).get(`${API}/health`);
+    expect(res.headers['x-request-id']).toBeTruthy();
   });
 });

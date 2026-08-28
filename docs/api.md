@@ -42,11 +42,24 @@ O fluxo:
 
 ## Endpoints por módulo
 
-### Health
+### Health e Observabilidade
 | Método | Rota                | Acesso |
 |--------|---------------------|--------|
 | GET    | `/api/v1/health`    | Público |
 | GET    | `/api/v1/ready`     | Público |
+| GET    | `/api/v1/metrics`   | Público |
+
+- `/health` — status geral + checagens por dependência (`database`, `redis`,
+  `memory`) com latência; alimenta os gauges `ehorta_database_up`/`ehorta_redis_up`.
+- `/ready` — readiness: banco + Redis acessíveis.
+- `/metrics` — métricas no formato de exposição do Prometheus (text 0.0.4):
+  `http_requests_total` (labels `method`/`route`/`status`),
+  `http_request_duration_seconds` (histograma por `method` — o scrape do
+  `/metrics` não alimenta as próprias métricas) e gauges de processo
+  (`nodejs_heap_bytes`, `nodejs_rss_bytes`, `nodejs_uptime_seconds`, ...).
+- Toda resposta carrega o header `X-Request-Id` (correlação); o mesmo
+  identificador, com `ip` e `userId` quando autenticado, acompanha os logs. Em
+  produção o log é emitido em **JSON** (stdout) para coleta centralizada.
 
 ### Auth
 | Método | Rota                          | Acesso |

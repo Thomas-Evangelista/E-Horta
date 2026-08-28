@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD, APP_FILTER } from '@nestjs/core';
 import { DatabaseModule } from './database/database.module';
 import { AuditModule } from './modules/audit/audit.module';
+import { ObservabilityModule } from './modules/observability/observability.module';
 import { HealthModule } from './modules/health/health.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
@@ -38,6 +39,7 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
     }),
     DatabaseModule,
     AuditModule,
+    ObservabilityModule,
     HealthModule,
     AuthModule,
     UsersModule,
