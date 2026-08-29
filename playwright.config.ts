@@ -18,7 +18,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'docker compose up -d --wait && pnpm db:deploy && pnpm db:seed',
+    command:
+      'pnpm db:deploy && pnpm db:seed && pnpm --filter @e-horta/api run dev & pnpm --filter @e-horta/web run dev',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 600_000,

@@ -2,172 +2,96 @@
 
 Plataforma de e-commerce de hortaliças e produtos frescos.
 
-## Stack
+- **API** — NestJS + PostgreSQL (Prisma) + Redis (BullMQ)
+- **Web** — Next.js 15 (loja do cliente)
+- **Admin** — Next.js 15 (painel administrativo)
 
-- **API** — NestJS (REST + Swagger) · PostgreSQL (Prisma) · Redis (BullMQ)
-- **Web** — Next.js 15 (App Router), loja do cliente
-- **Admin** — Next.js 15, painel administrativo
-- **Infra** — Docker Compose (PostgreSQL, Redis, MinIO)
+Rodado **sem Docker**: PostgreSQL, Redis e MinIO instalados no host; cada app em um terminal.
 
 ## Pré-requisitos
 
-- [Node.js](https://nodejs.org/) >= 20
-- [pnpm](https://pnpm.io/) >= 9
-- [Docker](https://www.docker.com/) + Docker Compose v2
+Antes do `pnpm setup`, instale e prepare os serviços que os scripts em `scripts/` esperam encontrar prontos:
 
-## Estrutura
+- **Node.js >= 20** e **pnpm >= 9** (`corepack enable` habilita a versão fixada em `packageManager`).
+- **PostgreSQL** (Ubuntu/Debian: `sudo apt-get install postgresql`) com um usuário `root`/senha `admin123` (mesmas credenciais de `.env.example`):
+  ```bash
+  sudo -u postgres psql -c "CREATE ROLE root WITH LOGIN SUPERUSER PASSWORD 'admin123';"
+  ```
+- **Redis** (Ubuntu/Debian: `sudo apt-get install redis-server`).
+- **MinIO** (opcional, só para upload de imagens):
+  ```bash
+  mkdir -p ~/.local/bin
+  curl -Lo ~/.local/bin/minio https://dl.min.io/server/minio/release/linux-amd64/minio
+  chmod +x ~/.local/bin/minio
+  ```
 
-```
-e-horta/
-├── apps/
-│   ├── api/          # Backend NestJS (porta 8080)
-│   ├── web/          # Frontend Next.js - loja (porta 3000)
-│   └── admin/        # Frontend Next.js - admin (porta 3001)
-├── packages/
-│   ├── types/        # Tipos TypeScript compartilhados
-│   ├── validation/   # Validações Zod compartilhadas
-│   ├── tsconfig/     # Configurações TypeScript
-│   └── eslint-config # Configurações ESLint
-├── prisma/           # Schema, migrations e seed
-├── specs/            # Especificações das fases
-└── docker-compose.yml
-```
-
-## Documentação
-
-| Documento | Conteúdo |
-|-----------|----------|
-| [`docs/architecture.md`](docs/architecture.md) | Arquitetura do monorepo, backend e frontend |
-| [`docs/api.md`](docs/api.md) | Endpoints REST por módulo (+ Swagger) |
-| [`docs/database.md`](docs/database.md) | Schema Prisma, enums e relacionamentos |
-| [`docs/deployment.md`](docs/deployment.md) | Deploy via Docker Compose e variáveis de ambiente |
-| [`docs/business-rules.md`](docs/business-rules.md) | Regras de negócio e fluxos |
+> Ambiente WSL2: se o VS Code/terminal ficar lento ou travando com os serviços rodando, aumente a memória alocada à distro em `C:\Users\<usuário>\.wslconfig` (seção `[wsl2]`, chave `memory`) e rode `wsl --shutdown` no PowerShell para aplicar.
 
 ## Como rodar
 
-### Opção 1: Docker (tudo em containers) — recomendado
+### 1. Setup (uma vez)
 
 ```bash
-pnpm docker:up
+pnpm setup
 ```
 
-O comando faz:
+Cria o `.env`, o banco `e_horta` (+ `e_horta_test` para testes), executa as migrations e o seed.
 
-1. **Encerra e remove containers existentes** — se houver algum do projeto em execução, para antes de subir de novo (evita containers duplicados/antigos);
-2. Constrói e sobe o stack completo — PostgreSQL, Redis, MinIO, API, Web e Admin.
+### 2. Subir o projeto
 
-As migrations são aplicadas automaticamente no boot da API. Para popular o banco com o seed (idempotente), rode uma vez:
+Abra um terminal para **cada** comando abaixo e deixe rodando:
 
 ```bash
-pnpm db:seed
+pnpm infra:minio   # (opcional) MinIO de upload de imagens
+pnpm dev:api       # API     -> http://localhost:8080
+pnpm dev:web       # Loja    -> http://localhost:3000
+pnpm dev:admin     # Admin   -> http://localhost:3001
 ```
 
-Ao final, acesse:
+Todos juntos num terminal só (logs misturados): `pnpm dev:all`.
 
-| Serviço       | URL                          |
-|---------------|------------------------------|
-| API           | http://localhost:8080       |
-| Docs (Swagger)| http://localhost:8080/api/docs |
-| Web           | http://localhost:3000       |
-| Admin         | http://localhost:3001       |
-| MinIO Console | http://localhost:9001       |
+> PostgreSQL e Redis são serviços do sistema e já devem estar ativos. Se precisar iniciá-los: `pnpm infra:postgres` e `pnpm infra:redis` (usam suas credenciais: Postgres usuário `root` / senha `admin123`).
 
-Parar/suspender tudo:
+### Acessos
 
-```bash
-pnpm docker:down
-```
+| Serviço        | URL                          |
+|----------------|------------------------------|
+| API            | http://localhost:8080       |
+| Docs (Swagger) | http://localhost:8080/api/docs |
+| Web (Loja)     | http://localhost:3000       |
+| Admin          | http://localhost:3001       |
+| MinIO Console  | http://localhost:9001       |
 
-Acompanhar os logs:
-
-```bash
-pnpm docker:logs
-```
-
-> **Nota:** em desenvolvimento os containers são criados sem política de restart
-> (`restart: unless-stopped` foi removido) e sem `--profile`. Ou seja, um único
-> `docker compose up -d` sobe **todos** os serviços, inclusive o Web.
-
-### Opção 2: Infra via Docker + apps locais (hot-reload)
-
-Subir apenas a infraestrutura e rodar as aplicações no host com watch:
-
-```bash
-docker compose up -d postgres redis minio
-cp .env.example .env   # se ainda não existir
-pnpm install
-pnpm db:generate
-pnpm db:migrate
-pnpm db:seed
-```
-
-Em seguida, em 3 terminais:
-
-```bash
-pnpm dev:api     # API (porta 8080)
-pnpm dev:web     # Web (porta 3000)
-pnpm dev:admin   # Admin (porta 3001)
-```
-
-Todos de uma vez com o script `dev:all` (log de todos no mesmo terminal).
+Login de teste (do seed): `admin@ehorta.com.br` / `admin123`
 
 ## Banco de dados
 
 ```bash
-pnpm db:generate   # Gerar Prisma Client
-pnpm db:migrate    # Criar/aplicar migrations (dev)
-pnpm db:deploy     # Aplicar migrations pendentes (sem criar novas)
-pnpm db:seed       # Popular o banco com dados iniciais
-pnpm db:reset      # Resetar o banco (roda seed ao final)
+pnpm db:setup      # cria bancos + migrations + seed
+pnpm db:generate   # gera o Prisma Client
+pnpm db:migrate    # aplica migrations (dev)
+pnpm db:seed       # popula o banco (idempotente)
+pnpm db:reset      # zera o banco e roda o seed
 ```
 
-## Variáveis de ambiente
+Conexão padrão: `postgresql://root:admin123@localhost:5432/e_horta` (definida em `DATABASE_URL` no `.env`).
 
-Copie `.env.example` para `.env` e ajuste:
+## Estrutura
 
-```bash
-cp .env.example .env
+```
+apps/
+  api/      # Backend NestJS (8080)
+  web/      # Loja Next.js (3000)
+  admin/    # Admin Next.js (3001)
+packages/   # Tipos, validações, tsconfig, eslint compartilhados
+prisma/     # Schema, migrations e seed
+scripts/    # Scripts de start (um por serviço)
 ```
 
-Em Docker, a `DATABASE_URL`/`REDIS_URL` internas do compose apontam para os
-containers (`postgres:5432`, `redis:6379`); as do `.env` são usadas pelos apps
-rodando no host (localhost).
+## Docs
 
-## Login de teste (seed)
-
-Após o seed, o usuário admin criado é:
-
-- **Email:** `admin@ehorta.com.br`
-- **Senha:** `Admin123!`
-
-## Comandos úteis
-
-| Comando              | Descrição                                   |
-|----------------------|---------------------------------------------|
-| `pnpm docker:up`     | Sobe tudo via Docker (para antigos e recria)|
-| `pnpm docker:down`   | Para e remove os containers                 |
-| `pnpm docker:logs`   | Logs de todos os serviços                   |
-| `pnpm dev:api`       | API em dev (watch)                          |
-| `pnpm dev:web`       | Web em dev (watch)                          |
-| `pnpm dev:admin`     | Admin em dev (watch)                        |
-| `pnpm dev:all`       | API + Web + Admin em paralelo               |
-| `pnpm build`         | Build da API                                |
-| `pnpm build:web`     | Build do Web                                |
-| `pnpm build:admin`   | Build do Admin                              |
-| `pnpm lint`          | Verificar lint                              |
-| `pnpm lint:fix`      | Corrigir lint                               |
-| `pnpm format`        | Formatar código                             |
-| `pnpm typecheck`     | Verificar tipos                             |
-| `pnpm test`          | Rodar testes                                |
-
-## Solução de problemas
-
-- **Web/Admin não respondem:** confira se outra aplicação (ex.: `pnpm dev:web`
-  rodando fora do Docker) não está ocupando as portas 3000/3001. Os containers
-  escutam em `127.0.0.1` e só sobem junto com o compose.
-- **Porta 5432 em uso:** se o PostgreSQL do host já usa 5432, altere o mapeamento
-  em `docker-compose.yml` e a `DATABASE_URL` do `.env` de forma coerente.
-- **Erros de migração/seed:** rode `pnpm docker:down` e depois `pnpm docker:up`
-  novamente — o script recria os containers do zero.
-- **Imagem Web não sobe:** o container define `HOSTNAME=0.0.0.0` (o Next
-  standalone usa essa variável para o bind). Não é necessário configurar nada.
+- [`docs/architecture.md`](docs/architecture.md) — arquitetura
+- [`docs/api.md`](docs/api.md) — endpoints REST
+- [`docs/database.md`](docs/database.md) — schema Prisma
+- [`docs/deployment.md`](docs/deployment.md) — deploy e variáveis de ambiente
+- [`docs/business-rules.md`](docs/business-rules.md) — regras de negócio

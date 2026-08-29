@@ -43,7 +43,7 @@ describe('apiRequest', () => {
     const env = await apiRequest<Array<{ id: number }>>('/products');
     expect(env.data).toEqual([{ id: 1 }]);
     const [url, init] = fetchMock.mock.calls[0];
-    expect(String(url)).toBe('http://localhost:8080/products');
+    expect(String(url)).toBe('http://localhost:8080/api/v1/products');
     expect(init.method).toBe('GET');
     expect(init.headers['Authorization']).toBe('Bearer admin-token');
   });
@@ -107,11 +107,19 @@ describe('apiRequest', () => {
     expect(err.code).toBe('MALFORMED');
   });
 
-  it('setAccessToken atualiza o token sem renovar', async () => {
+  it('setAccessToken é usado quando o getter não tem token', async () => {
+    getToken.mockReturnValue(null);
     setAccessToken('novo-token');
     fetchMock.mockResolvedValue(jsonResponse(200, { data: null, meta: {}, error: null }));
     await apiRequest('/products');
     expect(fetchMock.mock.calls[0][1].headers['Authorization']).toBe('Bearer novo-token');
+  });
+
+  it('usa o token do getter (store) a cada requisição', async () => {
+    getToken.mockReturnValue('token-atualizado');
+    fetchMock.mockResolvedValue(jsonResponse(200, { data: null, meta: {}, error: null }));
+    await apiRequest('/products');
+    expect(fetchMock.mock.calls[0][1].headers['Authorization']).toBe('Bearer token-atualizado');
   });
 });
 
@@ -120,6 +128,7 @@ describe('apiUpload', () => {
 
   beforeEach(() => {
     setAccessToken('admin-token');
+    bindApiSession({ getToken: () => null, refreshTokens: vi.fn(), onSessionExpired: vi.fn() });
     fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
   });
@@ -136,7 +145,7 @@ describe('apiUpload', () => {
     expect(env.data).toEqual({ url: 'https://cdn/x.jpg' });
 
     const [url, init] = fetchMock.mock.calls[0];
-    expect(String(url)).toContain('/uploads');
+    expect(String(url)).toContain('/api/v1/uploads');
     expect(init.method).toBe('POST');
     expect(init.body).toBeInstanceOf(FormData);
     expect(init.body.get('file')).toBe(file);

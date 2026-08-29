@@ -49,7 +49,7 @@ export const useSessionStore = create<SessionState>()(
 bindApiSession({
   getToken: () => useSessionStore.getState().accessToken,
   refreshTokens: async () => {
-    const { refreshToken } = useSessionStore.getState();
+    const { refreshToken, user } = useSessionStore.getState();
     if (!refreshToken) return null;
     try {
       const env = await apiRequest<{ accessToken: string; refreshToken: string }>('/auth/refresh', {
@@ -57,7 +57,12 @@ bindApiSession({
         body: { refreshToken },
       });
       if (env.data) {
-        useSessionStore.getState().setSession(env.data as unknown as User, env.data.accessToken, env.data.refreshToken);
+        useSessionStore.setState({
+          user,
+          accessToken: env.data.accessToken,
+          refreshToken: env.data.refreshToken,
+        });
+        setAccessToken(env.data.accessToken);
         return env.data.accessToken;
       }
     } catch {

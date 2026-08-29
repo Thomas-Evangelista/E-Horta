@@ -1,14 +1,15 @@
 # Banco de Dados
 
-- **SGBD**: PostgreSQL 16 (`postgres:16-alpine` no Docker)
+- **SGBD**: PostgreSQL 16 (instalado nativamente no host, sem Docker)
 - **ORM**: Prisma (`prisma/schema.prisma`)
 - **Migrations**: `prisma/migrations`
 - **Convenção**: tabelas em snake_case via `@@map`; colunas snake_case via `@map`
 
 ## Conectando
 
-A URL é definida pela variável `DATABASE_URL`. No Docker compose há um banco
-principal (`e_horta`) e há um **banco de testes isolado** (`e_horta_test`),
+A URL é definida pela variável `DATABASE_URL`
+(`postgresql://root:admin123@localhost:5432/e_horta`) no PostgreSQL local. Há um
+banco principal (`e_horta`) e um **banco de testes isolado** (`e_horta_test`),
 usado pelos testes de integração da API (spec 22).
 
 ```bash

@@ -28,10 +28,13 @@
     "db:deploy": "pnpm --filter @e-horta/api run db:deploy",
     "db:seed": "pnpm --filter @e-horta/api run db:seed",
     "db:reset": "pnpm --filter @e-horta/api run db:reset",
+    "db:setup": "bash scripts/setup.sh",
+    "setup": "bash scripts/setup.sh",
     "dev:all": "pnpm --filter @e-horta/api --filter @e-horta/web --filter @e-horta/admin --parallel run dev",
-    "docker:up": "docker compose down --remove-orphans && docker compose up -d --build",
-    "docker:down": "docker compose down --remove-orphans",
-    "docker:logs": "docker compose logs -f"
+    "infra:postgres": "bash scripts/start-postgres.sh",
+    "infra:redis": "bash scripts/start-redis.sh",
+    "infra:minio": "bash scripts/start-minio.sh",
+    "dev:minio": "pnpm infra:minio"
   },
   "devDependencies": {
     "@e-horta/eslint-config": "workspace:*",

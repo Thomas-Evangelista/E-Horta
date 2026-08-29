@@ -112,5 +112,5 @@ Ambas falam com a API via um cliente HTTP compartilhado (centrado em
 
 ## Fluxo de execução (dev local)
 
-`README.md` documenta dois modos: stack completa via `docker compose` ou
-infraestrutura via Docker + apps no host (hot-reload).
+`README.md` documenta o fluxo sem Docker: PostgreSQL, Redis e MinIO rodando no
+host, e cada app (API, Web, Admin) executado em um terminal próprio (hot-reload).

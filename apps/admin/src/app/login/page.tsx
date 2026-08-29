@@ -35,19 +35,19 @@ export default function LoginPage() {
   async function onSubmit(data: LoginForm) {
     setLoading(true);
     try {
-      const env = await apiRequest<{ user: { id: string; name: string; email: string; role: string }; accessToken: string; refreshToken: string }>(
+      const env = await apiRequest<{ user: { id: string; name: string; email: string; role: string }; tokens: { accessToken: string; refreshToken: string } }>(
         '/auth/login',
         { body: data },
       );
       if (env.data) {
-        const { user, accessToken, refreshToken } = env.data;
+        const { user, tokens } = env.data;
         if (user.role !== 'ADMIN') {
           toast('error', 'Acesso restrito a administradores');
           setLoading(false);
           return;
         }
-        setSession(user, accessToken, refreshToken);
-        setAccessToken(accessToken);
+        setSession(user, tokens.accessToken, tokens.refreshToken);
+        setAccessToken(tokens.accessToken);
         router.replace('/');
       }
     } catch (err) {
@@ -71,7 +71,7 @@ export default function LoginPage() {
           <Input
             label="Email"
             type="email"
-            placeholder="admin@ehorta.com"
+            placeholder="admin@ehorta.com.br"
             error={errors.email?.message}
             {...register('email')}
           />

@@ -18,8 +18,14 @@ async function bootstrap() {
 
   app.use(helmet());
 
+  // CORS_ORIGIN aceita origens separadas por vírgula (ex.: web e admin em dev).
+  const corsOrigin = (configService.get<string>('CORS_ORIGIN', 'http://localhost:3000') ?? '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
   app.enableCors({
-    origin: configService.get<string>('CORS_ORIGIN', 'http://localhost:3000'),
+    origin: corsOrigin,
     credentials: true,
   });
 

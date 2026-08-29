@@ -6,11 +6,12 @@ import * as bcrypt from 'bcrypt';
 
 /**
  * URL do banco de testes isolado (spec 22: "Utilizar banco de testes isolado").
- * O postgres do docker-compose é reutilizado, mas com database própria.
+ * Usa o PostgreSQL local (usuário root/admin123), com database própria
+ * (`e_horta_test`). Em CI, `TEST_DATABASE_URL` é sobrescrita pelo GitHub Actions.
  */
 export const TEST_DATABASE_URL =
   process.env.TEST_DATABASE_URL ??
-  'postgresql://ehorta:ehorta_dev_2024@localhost:5432/e_horta_test';
+  'postgresql://root:admin123@localhost:5432/e_horta_test';
 
 const prisma = new PrismaClient({ datasources: { db: { url: TEST_DATABASE_URL } } });
 

@@ -44,3 +44,6 @@ docker/data/
 # Temp
 tmp/
 temp/
+
+# MinIO local data
+minio-data/
