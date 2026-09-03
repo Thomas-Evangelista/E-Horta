@@ -8,20 +8,33 @@ Utilizar Next.js App Router.
 
 ```
 app/
-├── page.tsx                    # Home
-├── login/                      # Login
-├── cadastro/                   # Cadastro
-├── categorias/                 # Categorias
-├── produtos/
-│   └── [slug]/                 # Detalhe do produto
-├── busca/                      # Busca
-├── carrinho/                   # Carrinho
-├── checkout/                   # Checkout
-├── pedidos/
-│   ├── page.tsx                # Lista de pedidos
-│   └── [id]/                   # Detalhe do pedido
-├── conta/                      # Minha conta
-└── layout.tsx                  # Layout raiz
+├── (store)/                    # Route group do storefront (não afeta a URL)
+│   ├── page.tsx                # Home
+│   ├── login/                  # Login
+│   ├── cadastro/                # Cadastro
+│   ├── categorias/             # Categorias
+│   ├── produtos/
+│   │   └── [slug]/             # Detalhe do produto
+│   ├── busca/                  # Busca
+│   ├── carrinho/                # Carrinho
+│   ├── checkout/                # Checkout
+│   ├── pedidos/
+│   │   ├── page.tsx            # Lista de pedidos
+│   │   └── [id]/               # Detalhe do pedido
+│   ├── conta/                   # Minha conta
+│   └── layout.tsx               # Header, BottomNav, Footer
+├── admin/                       # Painel administrativo (prefixo /admin)
+│   ├── login/                   # Login do admin
+│   └── (protected)/              # Rotas exigem role ADMIN (AdminShell)
+│       ├── page.tsx             # Dashboard
+│       ├── produtos/
+│       ├── pedidos/
+│       ├── categorias/
+│       ├── estoque/
+│       ├── promocoes/
+│       ├── usuarios/
+│       └── avaliacoes/
+└── layout.tsx                   # Layout raiz (html/body/Providers)
 ```
 
 ## Componentes

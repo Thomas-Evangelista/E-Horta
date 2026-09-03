@@ -1,7 +1,4 @@
 import type { Metadata, Viewport } from 'next';
-import { Suspense } from 'react';
-import { BottomNav } from '@/components/layout/bottom-nav';
-import { Header } from '@/components/layout/header';
 import { ServiceWorkerRegister } from '@/components/pwa/service-worker-register';
 import { Providers } from './providers';
 import { siteUrl } from '@/lib/seo';
@@ -45,16 +42,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="pt-BR">
       <body className="min-h-dvh">
         <ServiceWorkerRegister />
-        <Providers>
-          <Suspense>
-            <Header />
-          </Suspense>
-          <main className="pb-24 md:pb-10">{children}</main>
-          <footer className="border-t border-cream-200 bg-cream-100 py-6 pb-24 text-center text-xs text-ink-400 md:pb-6">
-            E-Horta © {new Date().getFullYear()} — Frescor do campo na sua mesa.
-          </footer>
-          <BottomNav />
-        </Providers>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

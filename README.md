@@ -3,8 +3,7 @@
 Plataforma de e-commerce de hortaliças e produtos frescos.
 
 - **API** — NestJS + PostgreSQL (Prisma) + Redis (BullMQ)
-- **Web** — Next.js 15 (loja do cliente)
-- **Admin** — Next.js 15 (painel administrativo)
+- **Web** — Next.js 15 (loja do cliente + painel administrativo em `/admin`)
 
 Rodado **sem Docker**: PostgreSQL, Redis e MinIO instalados no host; cada app em um terminal.
 
@@ -43,9 +42,8 @@ Abra um terminal para **cada** comando abaixo e deixe rodando:
 
 ```bash
 pnpm infra:minio   # (opcional) MinIO de upload de imagens
-pnpm dev:api       # API     -> http://localhost:8080
-pnpm dev:web       # Loja    -> http://localhost:3000
-pnpm dev:admin     # Admin   -> http://localhost:3001
+pnpm dev:api       # API           -> http://localhost:8080
+pnpm dev:web       # Loja + Admin  -> http://localhost:3000
 ```
 
 Todos juntos num terminal só (logs misturados): `pnpm dev:all`.
@@ -59,10 +57,10 @@ Todos juntos num terminal só (logs misturados): `pnpm dev:all`.
 | API            | http://localhost:8080       |
 | Docs (Swagger) | http://localhost:8080/api/docs |
 | Web (Loja)     | http://localhost:3000       |
-| Admin          | http://localhost:3001       |
+| Admin          | http://localhost:3000/admin |
 | MinIO Console  | http://localhost:9001       |
 
-Login de teste (do seed): `admin@ehorta.com.br` / `admin123`
+Login de teste (do seed): `admin@ehorta.com.br` / `admin123` (funciona tanto em `/login` quanto em `/admin/login`, mas o acesso ao painel exige `role = ADMIN`).
 
 ## Banco de dados
 
@@ -81,8 +79,7 @@ Conexão padrão: `postgresql://root:admin123@localhost:5432/e_horta` (definida 
 ```
 apps/
   api/      # Backend NestJS (8080)
-  web/      # Loja Next.js (3000)
-  admin/    # Admin Next.js (3001)
+  web/      # Loja Next.js (3000) + Admin em /admin (mesmo app/porta)
 packages/   # Tipos, validações, tsconfig, eslint compartilhados
 prisma/     # Schema, migrations e seed
 scripts/    # Scripts de start (um por serviço)

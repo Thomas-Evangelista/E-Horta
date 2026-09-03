@@ -30,14 +30,29 @@
   --color-ink-800: #292520;
   --color-ink-900: #1c1915;
 
+  --color-red-50: #fef2f2;
+  --color-red-100: #fee2e2;
+  --color-red-500: #ef4444;
+  --color-red-600: #dc2626;
+
+  --color-yellow-50: #fffbeb;
+  --color-yellow-100: #fef3c7;
+  --color-yellow-600: #d97706;
+
+  --color-blue-50: #eff6ff;
+  --color-blue-100: #dbeafe;
+  --color-blue-600: #2563eb;
+
   --radius-card: 1rem;
   --radius-pill: 999px;
+  --radius-lg: 0.75rem;
 
   --shadow-card: 0 1px 3px rgb(41 37 32 / 0.06), 0 4px 14px rgb(41 37 32 / 0.05);
   --shadow-nav: 0 -4px 16px rgb(41 37 32 / 0.08);
 
   --z-header: 40;
   --z-nav: 50;
+  --z-sidebar: 30;
   --z-toast: 100;
 }
 

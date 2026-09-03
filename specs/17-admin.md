@@ -2,7 +2,10 @@
 
 ## Aplicação
 
-Criar aplicação administrativa separada (`apps/admin`).
+Painel administrativo integrado ao `apps/web`, sob o prefixo de rota `/admin`
+(não é mais um app Next.js separado — ver decisão em `AGENTS.md`, 2026-09-01).
+Acesso restrito a usuários com `role = ADMIN`, verificado no client (`AdminShell`)
+e, de forma autoritativa, pelos guards da API.
 
 ## Dashboard
 

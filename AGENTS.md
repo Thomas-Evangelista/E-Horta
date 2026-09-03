@@ -8,25 +8,25 @@ antes ou durante a execução, para manter o histórico acessível em futuras se
 
 ## Visão geral
 
-Plataforma de e-commerce de hortaliças e produtos frescos. Monorepo pnpm com 3 apps:
+Plataforma de e-commerce de hortaliças e produtos frescos. Monorepo pnpm com 2 apps:
 
 | App     | Stack                    | Porta |
 |---------|--------------------------|-------|
 | `api`   | NestJS 10 + PostgreSQL (Prisma) + Redis (BullMQ) + MinIO | 8080 |
-| `web`   | Next.js 15 (loja do cliente)                            | 3000 |
-| `admin` | Next.js 15 (painel administrativo)                      | 3001 |
+| `web`   | Next.js 15 (loja do cliente em `/` + painel administrativo em `/admin`) | 3000 |
 
 - Saudável: `http://localhost:8080/health` · `/ready`
 - Docs (Swagger): `http://localhost:8080/api/docs`
-- Login de teste (seed): `admin@ehorta.com.br` / `admin123`
+- Login de teste (seed): `admin@ehorta.com.br` / `admin123` (acesso a `/admin` exige `role = ADMIN`)
 
 ## Estrutura
 
 ```
 apps/
   api/      # Backend NestJS (8080) — módulos em apps/api/src/modules/
-  web/      # Loja Next.js (3000)
-  admin/    # Admin Next.js (3001)
+  web/      # Loja Next.js (3000) — rotas de storefront em src/app/(store)/,
+            # painel admin em src/app/admin/ (componentes/libs exclusivos
+            # namespaced em src/components/admin/ e src/lib/admin/)
 packages/   # Tipos, validações, tsconfig, eslint compartilhados
 prisma/     # Schema, migrations e seed
 scripts/    # Scripts de start/setup (um por serviço) + setup.sh
@@ -81,6 +81,21 @@ Ao receber uma nova solicitação, adicione uma entrada neste formato:
 - **Ações tomadas**: resumo das mudanças implementadas (opens, módulos, testes)
 - **Verificação**: como foi validada (lint/typecheck/testes/E2E)
 ```
+
+### 2026-09-01 — Fusão do app admin dentro do app web (elimina apps/admin)
+
+- **Status**: `concluída`
+- **Origem**: pedido do usuário (motivado pela sobrecarga de RAM ao rodar 2 servidores Next.js + API simultaneamente num notebook com 8GB)
+- **Solicitação**: unificar o servidor Web e o Admin num único app Next.js, já que não havia motivo para mantê-los separados; reescrever specs/docs afetados.
+- **Decisões**:
+  - `apps/admin` foi extinto; suas rotas viraram `apps/web/src/app/admin/**` (`/admin`, `/admin/login`, `/admin/produtos`, etc.), evitando colisão com as rotas de storefront de mesmo nome (`/produtos`, `/pedidos`...).
+  - Rotas de storefront movidas para o route group `apps/web/src/app/(store)/**`; layout raiz (`app/layout.tsx`) ficou minimalista (html/body/Providers), Header/BottomNav/Footer passaram para `(store)/layout.tsx`, e `admin/layout.tsx` ganhou metadata e `ToastProvider` próprios.
+  - Sessão (`stores/session.ts`), cliente HTTP (`lib/api-client.ts`) e erros (`lib/errors.ts`) foram **unificados** usando as versões do `web` (o `admin` tinha uma classe `ApiError` duplicada e um mapa de mensagens amigáveis com códigos que não batiam com os códigos reais da API — bug pré-existente, corrigido na fusão). `apiUpload` (usado no upload de imagens de produto) foi portado para o `api-client.ts` unificado.
+  - Componentes e libs exclusivos do admin (com estilo visual próprio, ex.: `Button` com variante `danger`, toasts em formato pill) foram mantidos namespaced em `components/admin/**` e `lib/admin/**` em vez de forçar merge com os componentes do storefront — evita risco de quebrar visual/API de um lado ao ajustar o outro.
+  - `AdminShell` passou a checar `user.role === 'ADMIN'` (antes só checava se havia *algum* usuário logado — falha de segurança que a fusão introduziria, já que agora storefront e admin compartilham a mesma sessão).
+  - `formatNumber`/`formatDateTime` (só existiam no admin) foram incorporados a `lib/format.ts`; `formatDiscount`/`constants.ts`/`query-keys.ts` do admin mantidos em `lib/admin/` por terem assinatura/namespacing incompatíveis com as versões do storefront.
+- **Ações tomadas**: ver commit correspondente — moveu ~30 arquivos de `apps/admin` para `apps/web`, criou layouts `(store)` e `admin`, atualizou `package.json` raiz (removeu `dev:admin`/`build:admin`), `.github/workflows/ci.yml` (removeu step "Build Admin"), `README.md`, `specs/17-admin.md`, `specs/02-arquitetura-projeto.md`, `specs/18-frontend.md`.
+- **Verificação**: `pnpm lint`, `pnpm typecheck`, `pnpm test` (web) rodados após a fusão — ver resultado no fim desta sessão.
 
 ### 2026-08-28 — Correção do login (impossibilidade de entrar na home do admin)
 - **Status**: `concluída`

@@ -1,7 +1,12 @@
 const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+const num = new Intl.NumberFormat('pt-BR');
 
 export function formatPrice(value: number): string {
   return brl.format(value);
+}
+
+export function formatNumber(value: number): string {
+  return num.format(value);
 }
 
 export function formatDiscount(price: number, compareAt: number): number {
@@ -11,6 +16,10 @@ export function formatDiscount(price: number, compareAt: number): number {
 
 export function formatDate(iso: string): string {
   return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' }).format(new Date(iso));
+}
+
+export function formatDateTime(iso: string): string {
+  return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(iso));
 }
 
 const MINUTE = 60_000;

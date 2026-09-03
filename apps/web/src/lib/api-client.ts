@@ -126,3 +126,23 @@ let applyRefreshedTokens: (tokens: { accessToken: string; refreshToken: string }
 export function bindTokenUpdater(updater: (tokens: { accessToken: string; refreshToken: string }) => void): void {
   applyRefreshedTokens = updater;
 }
+
+/** Upload multipart (ex.: imagens de produto no admin) — sem Content-Type manual, o browser define o boundary. */
+export async function apiUpload<T>(
+  path: string,
+  file: File,
+  extra?: Record<string, string>,
+): Promise<ApiEnvelope<T>> {
+  const form = new FormData();
+  form.append('file', file);
+  if (extra) {
+    for (const [key, value] of Object.entries(extra)) form.append(key, value);
+  }
+
+  const headers = new Headers();
+  const { accessToken } = getSession();
+  if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
+
+  const response = await fetch(buildUrl(path), { method: 'POST', headers, body: form, cache: 'no-store' });
+  return parseEnvelope<T>(response);
+}

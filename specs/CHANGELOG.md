@@ -4,7 +4,43 @@ Registro de modificações do projeto, organizado por fase de implementação.
 
 ---
 
-## Fase 25 — Observabilidade *(atual)*
+## Fase 26 — Fusão do Admin no Web (frontend único) *(atual)*
+
+**Escopo:** eliminar `apps/admin` como app Next.js separado — motivado pela
+sobrecarga de RAM ao rodar 2 servidores Next.js + API simultaneamente num
+notebook com 8GB. Detalhe completo da decisão em `AGENTS.md`
+("Solicitações de Alteração", 2026-09-01).
+
+- `apps/admin` removido; suas rotas passaram a viver em
+  `apps/web/src/app/admin/**` (`/admin`, `/admin/login`, `/admin/produtos`,
+  `/admin/pedidos`, `/admin/categorias`, `/admin/estoque`, `/admin/promocoes`,
+  `/admin/usuarios`, `/admin/avaliacoes`) — prefixo `/admin` evita colisão com
+  as rotas de storefront de mesmo nome.
+- Rotas de storefront movidas para o route group `apps/web/src/app/(store)/**`;
+  layout raiz virou minimalista (`html`/`body`/Providers) e cada seção
+  (`(store)` e `admin`) ganhou layout/`ToastProvider` próprios.
+- `stores/session.ts`, `lib/api-client.ts` (com `apiUpload` portado) e
+  `lib/errors.ts` unificados na versão do `web` — o `admin` tinha uma classe
+  `ApiError` duplicada e códigos de erro amigável que não batiam com os
+  retornados pela API (bug pré-existente, corrigido na fusão).
+- `AdminShell` passou a exigir `user.role === 'ADMIN'` (antes só checava se
+  havia *algum* usuário logado — falha que a fusão introduziria, já que
+  storefront e admin agora compartilham a mesma sessão).
+- Componentes e libs com identidade visual própria do admin mantidos
+  namespaced em `components/admin/**` e `lib/admin/**` (sem merge forçado com
+  os componentes do storefront).
+- `formatNumber`/`formatDateTime` incorporados a `lib/format.ts`; scripts
+  `dev:admin`/`build:admin` e o step "Build Admin" do CI removidos.
+- Docs atualizadas: `README.md`, `specs/17-admin.md`, `specs/02-arquitetura-projeto.md`,
+  `specs/18-frontend.md`.
+- **Verificação:** `pnpm typecheck`, `pnpm lint` e `pnpm test` (web) sem erros —
+  19 arquivos de teste, 118/118 testes passando; smoke test do dev server
+  confirmando `/`, `/admin`, `/admin/login` e `/admin/produtos` sem colisão de
+  rota.
+
+---
+
+## Fase 25 — Observabilidade
 
 **Escopo:** instrumentação do backend (item planejado na Fase 24): correlação de
 requisições, logging estruturado, métricas no formato Prometheus e healthcheck

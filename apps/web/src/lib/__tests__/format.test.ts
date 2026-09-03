@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { formatDate, formatDiscount, formatPrice, formatRelativeTime } from '../format';
+import { formatDate, formatDateTime, formatDiscount, formatNumber, formatPrice, formatRelativeTime } from '../format';
 
 describe('formatPrice', () => {
   it('formata valores em BRL', () => {
@@ -29,6 +29,18 @@ describe('formatDiscount', () => {
 describe('formatDate', () => {
   it('formata data ISO no padrão pt-BR', () => {
     expect(formatDate('2026-08-27T00:00:00.000Z')).toBe('27/08/2026');
+  });
+});
+
+describe('formatDateTime', () => {
+  it('formata data e hora no padrão pt-BR', () => {
+    expect(formatDateTime('2026-08-27T14:30:00.000Z')).toMatch(/27\/08\/2026/);
+  });
+});
+
+describe('formatNumber', () => {
+  it('agrupa milhares', () => {
+    expect(formatNumber(1200)).toMatch(/1\.200/);
   });
 });
 

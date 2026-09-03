@@ -11,30 +11,32 @@ e-horta/
 │
 ├── apps/
 │   │
-│   ├── web/                    # Frontend (Next.js)
+│   ├── web/                    # Frontend (Next.js) — loja + /admin
 │   │   ├── app/
+│   │   │   ├── (store)/        # Rotas do storefront (home, produtos, carrinho...)
+│   │   │   └── admin/          # Rotas do painel administrativo
 │   │   ├── components/
+│   │   │   └── admin/          # Componentes exclusivos do admin
 │   │   ├── features/
 │   │   ├── hooks/
 │   │   ├── lib/
+│   │   │   └── admin/          # Libs exclusivas do admin
 │   │   ├── stores/
 │   │   ├── services/
 │   │   ├── types/
 │   │   └── tests/
 │   │
-│   ├── api/                    # Backend (NestJS)
-│   │   ├── src/
-│   │   │   ├── modules/
-│   │   │   ├── common/
-│   │   │   ├── config/
-│   │   │   ├── database/
-│   │   │   ├── guards/
-│   │   │   ├── interceptors/
-│   │   │   ├── filters/
-│   │   │   └── main.ts
-│   │   └── test/
-│   │
-│   └── admin/                  # Admin (Next.js)
+│   └── api/                    # Backend (NestJS)
+│       ├── src/
+│       │   ├── modules/
+│       │   ├── common/
+│       │   ├── config/
+│       │   ├── database/
+│       │   ├── guards/
+│       │   ├── interceptors/
+│       │   ├── filters/
+│       │   └── main.ts
+│       └── test/
 │
 ├── packages/
 │   ├── ui/                     # Componentes compartilhados

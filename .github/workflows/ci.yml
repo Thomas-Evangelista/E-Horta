@@ -56,9 +56,6 @@ jobs:
       - name: Build Web
         run: pnpm build:web
 
-      - name: Build Admin
-        run: pnpm build:admin
-
   integration:
     name: Testes de integração da API
     runs-on: ubuntu-latest

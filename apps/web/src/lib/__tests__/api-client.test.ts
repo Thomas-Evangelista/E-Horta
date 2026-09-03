@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../errors';
 import {
   apiRequest,
+  apiUpload,
   bindApiSession,
   bindTokenUpdater,
 } from '../api-client';
@@ -138,5 +139,44 @@ describe('apiRequest', () => {
 
     await expect(apiRequest('/me')).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
     expect(refreshTokens).not.toHaveBeenCalled();
+  });
+});
+
+describe('apiUpload', () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    bindApiSession({
+      getSession: () => ({ accessToken: 'admin-token', refreshToken: null }),
+      onSessionExpired: vi.fn(),
+      refreshTokens: vi.fn(),
+    });
+    fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('envia FormData com o arquivo e retorna o envelope', async () => {
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ data: { url: 'https://cdn/x.jpg' }, meta: {}, error: null }), {
+        status: 201,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    const file = new File(['conteudo'], 'foto.jpg', { type: 'image/jpeg' });
+
+    const env = await apiUpload<{ url: string }>('/uploads', file, { productId: 'p1' });
+    expect(env.data).toEqual({ url: 'https://cdn/x.jpg' });
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain('/api/v1/uploads');
+    expect(init.method).toBe('POST');
+    expect(init.body).toBeInstanceOf(FormData);
+    expect(init.body.get('file')).toBe(file);
+    expect(init.body.get('productId')).toBe('p1');
+    expect(init.headers.get('Authorization')).toBe('Bearer admin-token');
   });
 });

@@ -3,7 +3,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 import { MotionConfig } from 'framer-motion';
-import { ToastProvider } from '@/components/feedback/toast';
 import '@/stores/session';
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -23,9 +22,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       {/* reducedMotion="user" desliga animações para quem prefere menos movimento */}
-      <MotionConfig reducedMotion="user">
-        <ToastProvider>{children}</ToastProvider>
-      </MotionConfig>
+      <MotionConfig reducedMotion="user">{children}</MotionConfig>
     </QueryClientProvider>
   );
 }
