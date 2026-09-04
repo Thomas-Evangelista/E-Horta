@@ -1,6 +1,6 @@
 # 28 — Otimização, Performance e Acessibilidade
 
-**Status:** parcialmente implementada — já concluídos: skip link, `aria-*` em paginação/navegação do admin, `ConfirmDialog` acessível, PWA install prompt, **rate limiting global da API** e **cache Redis do catálogo** (ver `specs/CHANGELOG.md`, "Fase 28 (continuação)" — 2026-09-04). Itens restantes dos primeiros do roadmap — **Índices Prisma**, **Performance — Frontend** (imagens/prefetch), PWA completo e restante de **Acessibilidade** — ainda não iniciados.
+**Status:** parcialmente implementada — já concluídos: skip link, `aria-*` em paginação/navegação do admin, `ConfirmDialog` acessível, PWA install prompt, **rate limiting global da API**, **cache Redis do catálogo** e **índices Prisma** (ver `specs/CHANGELOG.md`, "Fase 28 (continuação)" — 2026-09-04). Itens restantes dos primeiros do roadmap — **Performance — Frontend** (imagens/prefetch), PWA completo e restante de **Acessibilidade** — ainda não iniciados.
 **Objetivo:** fechar os gaps de performance, PWA e acessibilidade identificados nas fases anteriores, preparando o projeto para produção.
 
 ---
@@ -15,14 +15,15 @@
 - Keys com prefixo `cache:` + namespace: `cache:products:list:*`, `cache:products:{slug}`, `cache:categories:list:*`, `cache:categories:{slug}`
 - Ver `apps/api/src/modules/cache/` e `specs/CHANGELOG.md`.
 
-### Índices Prisma
+### Índices Prisma — ✅ concluído
 
 - Avaliar queries mais lentas via `pg_stat_statements` ou logs de duração
 - Adicionar índices compostos para:
   - `orders`: `(user_id, created_at)`, `(status, created_at)`
   - `audit_logs`: `(action, created_at)`, `(user_id, created_at)`
-  - `reviews`: `(product_id, status)` (já existe parcial)
-- `prisma migrate dev` + validação com `EXPLAIN ANALYZE`
+  - `reviews`: `(product_id, status)` (já existia) + `(status, created_at)` (moderação admin)
+  - `notifications`: `(user_id, created_at)` (lista paginada da conta)
+- `prisma migrate dev` + validação com `EXPLAIN` (planner usa os índices — ver migration `20260904194831_add_performance_indexes`)
 
 ### Rate limiting — ✅ concluído
 

@@ -299,6 +299,8 @@ model Order {
   @@index([userId])
   @@index([status])
   @@index([createdAt])
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
   @@map("orders")
 }
 
@@ -371,6 +373,7 @@ model Review {
 
   @@unique([userId, productId])
   @@index([productId, status])
+  @@index([status, createdAt])
   @@map("reviews")
 }
 
@@ -387,6 +390,7 @@ model Notification {
   order Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
 
   @@index([userId])
+  @@index([userId, createdAt])
   @@map("notifications")
 }
 
@@ -443,6 +447,8 @@ model AuditLog {
   user User? @relation(fields: [userId], references: [id])
 
   @@index([userId])
+  @@index([action, createdAt])
+  @@index([userId, createdAt])
   @@index([entity, entityId])
   @@map("audit_logs")
 }

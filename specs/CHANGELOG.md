@@ -4,6 +4,29 @@ Registro de modificações do projeto, organizado por fase de implementação.
 
 ---
 
+## Fase 28 (continuação) — Índices Prisma
+
+**Escopo:** terceiro item de performance do roadmap de `specs/28-otimizacao-performance-acessibilidade.md` — índices compostos para as queries mais frequentes de listagem/ordenação em `orders`, `audit_logs`, `reviews` e `notifications`.
+
+### Índices compostos (API/banco)
+
+- Migration `20260904194831_add_performance_indexes` com 6 índices novos:
+  - `orders`: `(user_id, created_at)` — "Meus pedidos" (`findAllByUser`, ORDER BY `created_at` DESC) e `(status, created_at)` — listagem admin com filtro de status.
+  - `audit_logs`: `(action, created_at)` e `(user_id, created_at)` — listagem admin com filtro de ação/ordenação por data.
+  - `reviews`: `(status, created_at)` — moderação no admin (filtro por status + mais recentes); o `(product_id, status)` já existia.
+  - `notifications`: `(user_id, created_at)` — lista paginada de notificações da conta.
+- Índices únicos de coluna simples existentes em `orders`/`audit_logs`/`notifications` foram mantidos (ainda servem outros predicates).
+- Validação: `EXPLAIN` no dev DB mostrou o planner usando cada índice — `orders` com **Index Only Scan Backward** nos dois compostos; `audit_logs`/`notifications`/`reviews` com **Bitmap Index Scan** no índice composto (sem varredura full table).
+
+### Verificação
+
+- `pnpm lint`: 0 erros (119 warnings pré-existentes, sem novos erros).
+- `pnpm typecheck` (monorepo): limpo.
+- `pnpm test` (API): 25 suítes / 240 testes.
+- `pnpm test:e2e` (API): 2 suítes / 31 testes (migration também aplicada no `e_horta_test`).
+
+---
+
 ## Fase 28 (continuação) — Cache Redis do catálogo
 
 **Escopo:** segundo item de performance do roadmap de `specs/28-otimizacao-performance-acessibilidade.md` — cache de catálogo (cache-aside) em Redis para `GET /products` (60s), `GET /products/:slug` (60s) e `GET /categories` (300s), com invalidação nos writes de produto/categoria.

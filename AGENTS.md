@@ -80,6 +80,19 @@ Ao receber uma nova solicitação, adicione uma entrada neste formato:
 - **Verificação**: como foi validada (lint/typecheck/testes/E2E)
 ```
 
+### 2026-09-04 — Índices Prisma compostos (Fase 28, item 3 do roadmap)
+
+- **Status**: `concluída`
+- **Origem**: continuação da Fase 28 após o commit do cache Redis (`d764ab3`); próximo item do roadmap foi **Índices Prisma**.
+- **Solicitação**: adicionar índices compostos para as queries mais lentas de listagem/ordenação, conforme spec 28, e validar com `EXPLAIN ANALYZE`.
+- **Decisões**:
+  - Analisadas as queries reais dos services: `orders` (`findAllByUser` por `userId` + `createdAt` DESC; admin por `status` + `createdAt` DESC), `audit_logs` (admin por `action`/`userId` + `createdAt` DESC), `reviews` (moderação admin por `status` + `createdAt` DESC), `notifications` (lista paginada por `userId` + `createdAt` DESC).
+  - 6 índices novos na migration `20260904194831_add_performance_indexes`: `orders(user_id, created_at)`, `orders(status, created_at)`, `audit_logs(action, created_at)`, `audit_logs(user_id, created_at)`, `reviews(status, created_at)` e `notifications(user_id, created_at)`. O `(product_id, status)` de reviews já existia. Índices simples antigos mantidos (servem outros predicates).
+  - `reviews(status, created_at)` e `notifications(user_id, created_at)` foram além da lista explícita da spec, justificados pelas queries de moderação e da conta (mesmas classes de acesso).
+  - `prisma migrate dev --name` via `pnpm --filter @e-horta/api db:migrate --name ...` (o script direto `dotenv` não fica no PATH; `db:migrate` sem `--name` pediria input interativo).
+- **Ações tomadas**: `prisma/schema.prisma` (4 modelos, 6 `@@index`), migration + client regenerado, validação `EXPLAIN` no dev DB via script temporário com Prisma Client (removido após uso), docs (CHANGELOG + spec 28). `psql` não está no PATH no host — usar Prisma `$queryRawUnsafe` para `EXPLAIN`.
+- **Verificação**: `pnpm lint` 0 erros; `pnpm typecheck` OK; `pnpm test` API 25 suítes/240 testes; `pnpm test:e2e` 2 suítes/31 testes (migration aplicada também no `e_horta_test`); `EXPLAIN` confirmou Index Only Scan Backward (orders) e Bitmap Index Scan (demais) nos índices novos.
+
 ### 2026-09-04 — Cache Redis do catálogo (Fase 28, item 2 do roadmap)
 
 - **Status**: `concluída`
