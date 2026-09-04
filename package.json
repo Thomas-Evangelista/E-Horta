@@ -26,13 +26,8 @@
     "db:deploy": "pnpm --filter @e-horta/api run db:deploy",
     "db:seed": "pnpm --filter @e-horta/api run db:seed",
     "db:reset": "pnpm --filter @e-horta/api run db:reset",
-    "db:setup": "bash scripts/setup.sh",
-    "setup": "bash scripts/setup.sh",
-    "dev:all": "pnpm --filter @e-horta/api --filter @e-horta/web --parallel run dev",
-    "infra:postgres": "bash scripts/start-postgres.sh",
-    "infra:redis": "bash scripts/start-redis.sh",
-    "infra:minio": "bash scripts/start-minio.sh",
-    "dev:minio": "pnpm infra:minio"
+    "setup": "pnpm install && pnpm db:generate && pnpm db:migrate && pnpm db:seed",
+    "dev:all": "pnpm --filter @e-horta/api --filter @e-horta/web --parallel run dev"
   },
   "devDependencies": {
     "@e-horta/eslint-config": "workspace:*",

@@ -5,50 +5,42 @@ Plataforma de e-commerce de hortaliças e produtos frescos.
 - **API** — NestJS + PostgreSQL (Prisma) + Redis (BullMQ)
 - **Web** — Next.js 15 (loja do cliente + painel administrativo em `/admin`)
 
-Rodado **sem Docker**: PostgreSQL, Redis e MinIO instalados no host; cada app em um terminal.
+Rodado **sem Docker**, direto no Windows (PowerShell): PostgreSQL, Redis e MinIO instalados nativamente; cada app/serviço sobe em um terminal separado.
 
 ## Pré-requisitos
 
-Antes do `pnpm setup`, instale e prepare os serviços que os scripts em `scripts/` esperam encontrar prontos:
-
 - **Node.js >= 20** e **pnpm >= 9** (`corepack enable` habilita a versão fixada em `packageManager`).
-- **PostgreSQL** (Ubuntu/Debian: `sudo apt-get install postgresql`) com um usuário `root`/senha `admin123` (mesmas credenciais de `.env.example`):
-  ```bash
-  sudo -u postgres psql -c "CREATE ROLE root WITH LOGIN SUPERUSER PASSWORD 'admin123';"
+- **PostgreSQL** para Windows ([instalador oficial](https://www.postgresql.org/download/windows/)), rodando como serviço do Windows (inicia sozinho no boot; gerencie em `services.msc` como "postgresql-x64-..."). Crie o usuário `root`/senha `admin123` (mesmas credenciais de `.env.example`) e os dois bancos usados pelo projeto:
+  ```powershell
+  psql -U postgres -c "CREATE ROLE root WITH LOGIN SUPERUSER PASSWORD 'admin123';"
+  psql -U postgres -c "CREATE DATABASE e_horta OWNER root;"
+  psql -U postgres -c "CREATE DATABASE e_horta_test OWNER root;"
   ```
-- **Redis** (Ubuntu/Debian: `sudo apt-get install redis-server`).
-- **MinIO** (opcional, só para upload de imagens):
-  ```bash
-  mkdir -p ~/.local/bin
-  curl -Lo ~/.local/bin/minio https://dl.min.io/server/minio/release/linux-amd64/minio
-  chmod +x ~/.local/bin/minio
-  ```
-
-> Ambiente WSL2: se o VS Code/terminal ficar lento ou travando com os serviços rodando, aumente a memória alocada à distro em `C:\Users\<usuário>\.wslconfig` (seção `[wsl2]`, chave `memory`) e rode `wsl --shutdown` no PowerShell para aplicar.
+- **Redis**: não há build oficial para Windows. Use o [Memurai](https://www.memurai.com/) (compatível com Redis, roda como serviço do Windows) ou o Redis via WSL apenas para esse serviço, se preferir. Confirme que responde em `localhost:6379`.
+- **MinIO** (opcional, só para upload de imagens): baixe o binário Windows em https://dl.min.io/server/minio/release/windows-amd64/minio.exe e rode-o num terminal (veja abaixo).
 
 ## Como rodar
 
 ### 1. Setup (uma vez)
 
-```bash
+```powershell
+copy .env.example .env
 pnpm setup
 ```
 
-Cria o `.env`, o banco `e_horta` (+ `e_horta_test` para testes), executa as migrations e o seed.
+Instala dependências, gera o Prisma Client, aplica as migrations e roda o seed no banco `e_horta` (os bancos `e_horta`/`e_horta_test` precisam já existir — passo anterior).
 
 ### 2. Subir o projeto
 
-Abra um terminal para **cada** comando abaixo e deixe rodando:
+PostgreSQL e Redis já rodam como serviço do Windows em segundo plano (não precisam de terminal). Abra um terminal para **cada** comando abaixo e deixe rodando:
 
-```bash
-pnpm infra:minio   # (opcional) MinIO de upload de imagens
+```powershell
+.\minio.exe server .\minio-data --console-address ":9001"   # (opcional) upload de imagens
 pnpm dev:api       # API           -> http://localhost:8080
 pnpm dev:web       # Loja + Admin  -> http://localhost:3000
 ```
 
 Todos juntos num terminal só (logs misturados): `pnpm dev:all`.
-
-> PostgreSQL e Redis são serviços do sistema e já devem estar ativos. Se precisar iniciá-los: `pnpm infra:postgres` e `pnpm infra:redis` (usam suas credenciais: Postgres usuário `root` / senha `admin123`).
 
 ### Acessos
 
@@ -65,7 +57,7 @@ Login de teste (do seed): `admin@ehorta.com.br` / `admin123` (funciona tanto em 
 ## Banco de dados
 
 ```bash
-pnpm db:setup      # cria bancos + migrations + seed
+pnpm setup         # instala deps + gera Prisma Client + migrations + seed
 pnpm db:generate   # gera o Prisma Client
 pnpm db:migrate    # aplica migrations (dev)
 pnpm db:seed       # popula o banco (idempotente)
@@ -82,7 +74,6 @@ apps/
   web/      # Loja Next.js (3000) + Admin em /admin (mesmo app/porta)
 packages/   # Tipos, validações, tsconfig, eslint compartilhados
 prisma/     # Schema, migrations e seed
-scripts/    # Scripts de start (um por serviço)
 ```
 
 ## Docs

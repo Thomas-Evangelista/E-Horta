@@ -29,7 +29,6 @@ apps/
             # namespaced em src/components/admin/ e src/lib/admin/)
 packages/   # Tipos, validações, tsconfig, eslint compartilhados
 prisma/     # Schema, migrations e seed
-scripts/    # Scripts de start/setup (um por serviço) + setup.sh
 specs/      # Especificações por fase + CHANGELOG.md
 docs/       # architecture, api, database, deployment, business-rules
 e2e/        # testes Playwright (config playwright.config.ts)
@@ -39,10 +38,9 @@ e2e/        # testes Playwright (config playwright.config.ts)
 
 | Comando                | Descrição                                          |
 |------------------------|----------------------------------------------------|
-| `pnpm setup`           | Cria `.env`, bancos, migrations e seed (uma vez)   |
-| `pnpm dev:all`         | Sobe API + Web + Admin juntos (logs misturados)    |
-| `pnpm dev:api`         | App **separado**: API → 8080, Web → 3000, Admin → 3001 |
-| `pnpm infra:postgres` / `infra:redis` / `infra:minio` | Serviços do sistema |
+| `pnpm setup`           | Instala deps + gera Prisma Client + migrations + seed (uma vez) |
+| `pnpm dev:all`         | Sobe API + Web juntos (logs misturados)            |
+| `pnpm dev:api` / `dev:web` | App **separado**, um terminal cada: API → 8080, Web (+Admin em `/admin`) → 3000 |
 | `pnpm db:generate` / `migrate` / `deploy` / `seed` / `reset` | Prisma        |
 | `pnpm lint`            | ESLint em todo o monorepo (0 erros exigido)        |
 | `pnpm typecheck`       | `tsc --noEmit` em todos os workspaces              |
@@ -61,7 +59,7 @@ quando aplicável).
   `@e-horta/validation`), não duplicados nos apps.
 - **API**: módulos em `apps/api/src/modules/<nome>/` com `*.service.ts`,
   `*.controller.ts`, `*.module.ts`, DTOs com `class-validator`/`zod`, Swagger.
-- **Sem Docker por padrão**: PostgreSQL/Redis/MinIO no host; ver `scripts/`.
+- **Sem Docker por padrão**: PostgreSQL/Redis/MinIO instalados nativamente no host (Windows); ver `README.md`.
 - Fases e histórico completo em `specs/CHANGELOG.md` — atualizar ao finalizar uma fase.
 
 ---
@@ -81,6 +79,31 @@ Ao receber uma nova solicitação, adicione uma entrada neste formato:
 - **Ações tomadas**: resumo das mudanças implementadas (opens, módulos, testes)
 - **Verificação**: como foi validada (lint/typecheck/testes/E2E)
 ```
+
+### 2026-09-03 — Fluxo de senha completo (recuperar/redefinir/alterar) + gestão de status no Admin
+
+- **Status**: `concluída`
+- **Origem**: pedido do usuário (avançar para a próxima fase após análise do projeto; escopo escolhido: "Fluxo de Senha completo" = recuperar/redefinir via e-mail + alterar senha + gestão de status de usuários no admin)
+- **Solicitação**: completar o ciclo de senha da loja (esqueci/redefinir senha por e-mail e alteração de senha autenticada) e permitir ao administrador ativar/inativar/bloquear clientes.
+- **Decisões**:
+  - Token de redefinição: `randomBytes(32)` em texto plano enviado por e-mail e armazenado apenas como **hash SHA-256** (`tokenHash`) na tabela `PasswordResetToken`, com expiração de 1h (defensivo: senha/reset nunca em texto plano no banco). Uso da tabela via `$executeRaw`/`$queryRaw` (sem alterar o client do Prisma schema de forma acoplada).
+  - `forgotPassword` usa sucesso silencioso (conta inexistente/inativa retorna a mesma mensagem) para evitar enumeração de e-mails.
+  - `resetPassword` e `changePassword` rodam em transação e **revogam todos os `refresh_tokens`** do usuário (logout de todos os dispositivos ao trocar senha).
+  - `SITE_URL` adicionada à config validada (default `http://localhost:3000`) para montar o link de redefinição; `MailerService` passou a ser exportado por `NotificationsModule`.
+  - Páginas `esqueci-senha` e `redefinir-senha` usam `Suspense` + componente client por causa do `useSearchParams` (requisito do Next.js 15 para builds estáticos/hidratação).
+  - "Alterar senha" na `/conta` limpa a sessão local após sucesso (senha nova exige novo login; reforça segurança).
+  - Gestão de status no admin: apenas `role = CUSTOMER` recebe a coluna "Ações" (a API já rejeita mudar status de perfis administrativos e do próprio admin). Modal oferece Ativar/Inativar/Bloquear conforme o status atual, via `PATCH /admin/users/:id/status` (endpoint já existia).
+- **Ações tomadas**: novo modelo Prisma + migration; 3 endpoints de auth; métodos de serviço com envio de e-mail; páginas `esqueci-senha`/`redefinir-senha`; link no login; `useChangePassword` + seção "Alterar senha" na conta; coluna "Ações" + modal + mutation no admin de usuários; `SITE_URL` em `.env`/`.env.example`; `specs/CHANGELOG.md` (Fase 27).
+- **Verificação**: `pnpm lint` 0 erros; `pnpm typecheck` (api + web) OK; `pnpm test` — API 226/226, Web (vitest) 118/118.
+
+### 2026-09-03 — Remoção da pasta scripts/ (scripts bash exclusivos de Linux/WSL)
+
+- **Status**: `concluída`
+- **Origem**: pedido do usuário (voltou a usar VS Code nativo no Windows após travamentos no WSL/Ubuntu; `scripts/*.sh` não rodam fora de Linux)
+- **Solicitação**: remover a pasta `scripts/` e seus arquivos `.sh` (bash/systemctl/apt-get, específicos de Linux) e passar a subir cada serviço/app diretamente, um por terminal.
+- **Decisões**: sem wrapper de shell script — cada serviço de infra (PostgreSQL, Redis, MinIO) roda nativo no Windows (serviço do SO ou binário `.exe` num terminal) e cada app sobe via `pnpm dev:api`/`pnpm dev:web` direto.
+- **Ações tomadas**: apagada a pasta `scripts/`; `package.json` raiz — removidos `db:setup`, `infra:postgres`, `infra:redis`, `infra:minio`, `dev:minio` (chamavam `bash scripts/*.sh`); `setup` reescrito sem bash (`pnpm install && pnpm db:generate && pnpm db:migrate && pnpm db:seed`); `README.md` e `docs/deployment.md` reescritos com pré-requisitos e passos nativos do Windows (PostgreSQL/Redis/MinIO para Windows, comandos `psql`/PowerShell); referências a `scripts/` removidas de `README.md`/`AGENTS.md`.
+- **Verificação**: `pnpm setup`/`pnpm dev:api`/`pnpm dev:web` continuam funcionando via pnpm puro (sem dependência de bash); não há mais referências a `scripts/` ou `.sh` no repo.
 
 ### 2026-09-01 — Fusão do app admin dentro do app web (elimina apps/admin)
 

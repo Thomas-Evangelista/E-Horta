@@ -1,17 +1,18 @@
 # Deploy
 
 O **E-Horta** roda **sem Docker**: PostgreSQL, Redis e MinIO são instalados
-nativamente no host, e cada aplicação (API, Web, Admin) é executada
+nativamente no host (Windows), e cada aplicação (API, Web) é executada
 individualmente, uma em cada terminal.
 
 ## Execução local
 
-### 1. Infraestrutura (serviços do sistema / foreground)
+### 1. Infraestrutura
 
-```bash
-pnpm infra:postgres   # PostgreSQL (serviço do SO)
-pnpm infra:redis      # Redis (serviço do SO)
-pnpm infra:minio      # MinIO (foreground, terminal próprio)
+PostgreSQL e Redis rodam como serviço do Windows em segundo plano (sem terminal
+dedicado). MinIO (opcional) roda em foreground, num terminal próprio:
+
+```powershell
+.\minio.exe server .\minio-data --console-address ":9001"
 ```
 
 | Serviço   | Porta (host)              |
@@ -20,15 +21,13 @@ pnpm infra:minio      # MinIO (foreground, terminal próprio)
 | Redis     | 6379                      |
 | MinIO     | 9000 (API) / 9001 (console) |
 | API       | 8080                      |
-| Web       | 3000                      |
-| Admin     | 3001                      |
+| Web       | 3000 (loja + admin em `/admin`) |
 
 ### 2. Aplicações (um terminal para cada)
 
 ```bash
 pnpm dev:api      # API (porta 8080)
-pnpm dev:web      # Web (porta 3000)
-pnpm dev:admin    # Admin (porta 3001)
+pnpm dev:web      # Web + Admin (porta 3000)
 ```
 
 ## Banco de dados
@@ -84,5 +83,5 @@ Um PR **não** é aprovado se lint, TypeScript, testes ou build falharem
 2. Definir/exportar as variáveis de ambiente de produção
 3. Buildar e iniciar cada app (`nest build` + `next build`, depois `start`)
 4. Aplicar seed inicial em `1`x (`pnpm db:seed`) se necessário
-5. Configurar domínios/reverso proxy para as portas 3000/3001/8080
+5. Configurar domínios/reverso proxy para as portas 3000/8080
 6. Validar health checks (`/health` e `/ready`) e o site

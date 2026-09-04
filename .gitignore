@@ -37,6 +37,7 @@ prisma/migrations/**/migration_lock.toml
 coverage/
 test-results/
 playwright-report/
+test-output.txt
 
 # Docker
 docker/data/
