@@ -28,6 +28,7 @@ const configSchema = z.object({
     .enum(['true', 'false'])
     .optional()
     .default('false'),
+  CACHE_ENABLED: z.enum(['true', 'false']).optional().default('true'),
 });
 
 export function configValidation(config: Record<string, unknown>) {

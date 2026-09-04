@@ -4,6 +4,30 @@ Registro de modificações do projeto, organizado por fase de implementação.
 
 ---
 
+## Fase 28 (continuação) — Cache Redis do catálogo
+
+**Escopo:** segundo item de performance do roadmap de `specs/28-otimizacao-performance-acessibilidade.md` — cache de catálogo (cache-aside) em Redis para `GET /products` (60s), `GET /products/:slug` (60s) e `GET /categories` (300s), com invalidação nos writes de produto/categoria.
+
+### Cache de catálogo (API)
+
+- Novo [`CacheService`](../apps/api/src/modules/cache/cache.service.ts) (`modules/cache/`) — cache-aside sobre `ioredis` (já existia como dependência): `get`/`set` com TTL em segundos, `del` e `delByPrefix` (invalidação por prefixo via `SCAN` em lotes para as chaves `cache:products:*`/`cache:categories:*`). Degrada graciosamente: qualquer falha de Redis é logada como warn e o fluxo cai para o banco (nunca lança erro para o chamador).
+- Novo [`CacheModule`](../apps/api/src/modules/cache/cache.module.ts) importado por `ProductsModule` e `CategoriesModule`. **Desabilitado automaticamente em `NODE_ENV=test`** (e também com `CACHE_ENABLED=false`) para manter os e2e determinísticos.
+- `products.service.ts`: `findAll` cachado com chave `cache:products:list:{hash}` (hash SHA-256 dos filtros ativos: categoria/preço/busca/featured/available/promotion/sort/página/limite); `findBySlug` com `cache:products:{slug}` (TTL 60s). Invalidação via `delByPrefix('cache:products:')` ao final de `create`/`update`/`delete`.
+- `categories.service.ts`: `findAll(includeInactive)` com `cache:categories:list:active`/`:all` e `findBySlug` com `cache:categories:{slug}` (TTL 300s). Invalidação via `delByPrefix('cache:categories:')` em `create`/`update`/`delete`.
+- `config.validation.ts`: nova variável opcional `CACHE_ENABLED` (`'true'`/`'false'`, default `true`), documentada em `.env.example`.
+- Teste unitário [`cache.service.spec.ts`](../apps/api/src/modules/cache/cache.service.spec.ts) (ioredis mockado com store em memória): 7 casos — desabilitado em test, desabilitado por env, round-trip JSON, chave inexistente, `del`, `delByPrefix` e degradação com Redis fora.
+- **Gotcha de DI descoberto**: `import type { ConfigService }` em um provider derivado do metadata `design:paramtypes` vira `undefined` em runtime (import errado é apagado) → `Nest can't resolve dependencies`. O import de `ConfigService` em `CacheService` é um import **de valor** (mesmo que usado só como tipo) — ver `health.service.ts` (mesmo padrão).
+
+### Verificação
+
+- `pnpm lint`: 0 erros (109 warnings pré-existentes, sem novos erros).
+- `pnpm typecheck` (monorepo): limpo.
+- `pnpm test` (API): 25 suítes / 240 testes (7 novos do CacheService).
+- `pnpm test:e2e` (API): 2 suítes / 31 testes.
+- Smoke real no Redis local: `SCAN MATCH cache:smoke:*` + `DEL` remove apenas chaves do prefixo (demais intactas).
+
+---
+
 ## Fase 28 (continuação) — Rate limiting na API
 
 **Escopo:** primeiro item de performance/segurança do roadmap de `specs/28-otimizacao-performance-acessibilidade.md` — throttling global com `@nestjs/throttler`: 100 req/min públicas, 200 req/min autenticadas, 30 req/min nos endpoints sensíveis de auth.

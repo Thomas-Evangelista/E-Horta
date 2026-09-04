@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD, APP_FILTER } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { DatabaseModule } from './database/database.module';
+import { CacheModule } from './modules/cache/cache.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { ObservabilityModule } from './modules/observability/observability.module';
 import { HealthModule } from './modules/health/health.module';
@@ -41,6 +42,7 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
           : ['.env.local', '.env', '../../.env.local', '../../.env'],
     }),
     DatabaseModule,
+    CacheModule,
     ThrottlerModule.forRoot(rateLimitConfig),
     AuditModule,
     ObservabilityModule,

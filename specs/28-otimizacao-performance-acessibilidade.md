@@ -1,18 +1,19 @@
 # 28 — Otimização, Performance e Acessibilidade
 
-**Status:** parcialmente implementada — já concluídos: skip link, `aria-*` em paginação/navegação do admin, `ConfirmDialog` acessível, PWA install prompt e o **rate limiting global da API** (ver `specs/CHANGELOG.md`, "Fase 28 (continuação)"). Itens restantes dos primeiros itens do roadmap — **Cache Redis**, **Índices Prisma**, **Performance — Frontend** (imagens/prefetch), PWA completo e restante de **Acessibilidade** — ainda não iniciados.
+**Status:** parcialmente implementada — já concluídos: skip link, `aria-*` em paginação/navegação do admin, `ConfirmDialog` acessível, PWA install prompt, **rate limiting global da API** e **cache Redis do catálogo** (ver `specs/CHANGELOG.md`, "Fase 28 (continuação)" — 2026-09-04). Itens restantes dos primeiros do roadmap — **Índices Prisma**, **Performance — Frontend** (imagens/prefetch), PWA completo e restante de **Acessibilidade** — ainda não iniciados.
 **Objetivo:** fechar os gaps de performance, PWA e acessibilidade identificados nas fases anteriores, preparando o projeto para produção.
 
 ---
 
 ## 1. Performance — Backend
 
-### Cache Redis para catálogo
+### Cache Redis para catálogo — ✅ concluído
 
-- Criar `CacheInterceptor` global na API com TTL configurável por rota
+- `CacheService` (cache-aside) sobre `ioredis`, injetado em `products.service` e `categories.service`, sem dependência de `@nestjs/cache-manager`.
 - Cachear: `GET /products` (60s), `GET /categories` (300s), `GET /products/:slug` (60s)
-- Invalidar cache quando admin cria/edita/deleta produto ou categoria
-- Keys com prefixo `cache:` + namespace (ex: `cache:products:list`, `cache:products:{slug}`)
+- Invalidar cache quando admin cria/edita/deleta produto ou categoria (`delByPrefix` no fim dos writes)
+- Keys com prefixo `cache:` + namespace: `cache:products:list:*`, `cache:products:{slug}`, `cache:categories:list:*`, `cache:categories:{slug}`
+- Ver `apps/api/src/modules/cache/` e `specs/CHANGELOG.md`.
 
 ### Índices Prisma
 

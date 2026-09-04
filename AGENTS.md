@@ -80,8 +80,21 @@ Ao receber uma nova solicitação, adicione uma entrada neste formato:
 - **Verificação**: como foi validada (lint/typecheck/testes/E2E)
 ```
 
-### 2026-09-04 — Rate limiting global na API (Fase 28, item 1 do roadmap)
+### 2026-09-04 — Cache Redis do catálogo (Fase 28, item 2 do roadmap)
 
+- **Status**: `concluída`
+- **Origem**: pedido do usuário ("Sim faça o commit e prossiga") — continuação da Fase 28; próximo item do roadmap foi **Cache Redis**.
+- **Solicitação**: cache-aside de catálogo em Redis: `GET /products` (60s), `GET /categories` (300s), `GET /products/:slug` (60s), chaves `cache:` + namespace, invalidação quando admin cria/edita/deleta produto/categoria (spec 28).
+- **Decisões**:
+  - `CacheService` próprio sobre `ioredis` (já era dependência), em vez de `@nestjs/cache-manager` — dá controle das chaves por namespace e invalidação por prefixo (`cache:products:*`/`cache:categories:*`) exatamente como a spec pede. `get`/`set` (TTL s)/`del`/`delByPrefix` (SCAN em lotes, evita `KEYS`). Falha de Redis é logada como warn e o fluxo cai para o banco — nunca lança para o chamador.
+  - `delByPrefix` no fim de `create`/`update`/`delete` dos services (também cobrem as rotas `/admin/products`, `/admin/categories`, que delegam aos mesmos services).
+  - `findAll` de produtos: chave `cache:products:list:{hash}` (SHA-256 dos filtros ativos). Sem cache em `findAllForAdmin`/`findById` (contexto admin/cart, dados frescos).
+  - **Degradação graciosa:** cache desabilitado automaticamente em `NODE_ENV=test` (e com `CACHE_ENABLED=false`) para e2e determinístico; `CACHE_ENABLED` adicionada ao schema de validação (default `true`).
+  - **Gotcha de DI**: `import type { ConfigService }` num provider apaga o import em runtime → metadata `design:paramtypes` vira `undefined` → "Nest can't resolve dependencies". Import de **valor** (padrão do `health.service.ts`). `@Global()` também não resolve provider de outro módulo global (ConfigModule) — `CacheModule` ficou comum, importado por `ProductsModule`/`CategoriesModule`.
+- **Ações tomadas**: `modules/cache/` (module, service, spec unit); caching + invalidação em `products.service.ts`/`categories.service.ts`; `CACHE_ENABLED` em `config.validation.ts`/`.env.example`; docs (CHANGELOG + spec 28).
+- **Verificação**: `pnpm lint` 0 erros; `pnpm typecheck` OK; `pnpm test` API 25 suítes/240 testes (7 novos); `pnpm test:e2e` 2 suítes/31 testes; smoke `SCAN MATCH + DEL` real no Redis local (remove só chaves do prefixo).
+
+### 2026-09-04 — Rate limiting global na API (Fase 28, item 1 do roadmap)
 - **Status**: `concluída`
 - **Origem**: pedido do usuário (continuar a Fase 28 de `specs/28-otimizacao-performance-acessibilidade.md`; opções apresentadas → usuário escolheu rate limiting, com autorização para prosseguir)
 - **Solicitação**: adicionar `@nestjs/throttler` com limites globais (100 req/min públicas, 200 req/min autenticadas, 30 req/min de auth) e exceções para `/health`, `/ready`, `/metrics`.

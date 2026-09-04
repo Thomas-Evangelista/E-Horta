@@ -1,21 +1,41 @@
 import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { type Category } from '@prisma/client';
+import { CacheService } from '../cache/cache.service';
+
+const CATEGORIES_CACHE_TTL = 300;
+const CATEGORIES_CACHE_PREFIX = 'cache:categories:';
 
 @Injectable()
 export class CategoriesService {
   private readonly logger = new Logger(CategoriesService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cache: CacheService,
+  ) {}
 
   async findAll(includeInactive = false): Promise<Category[]> {
-    return this.prisma.category.findMany({
+    const cacheKey = includeInactive
+      ? `${CATEGORIES_CACHE_PREFIX}list:all`
+      : `${CATEGORIES_CACHE_PREFIX}list:active`;
+    const cached = await this.cache.get<Category[]>(cacheKey);
+    if (cached) return cached;
+
+    const categories = await this.prisma.category.findMany({
       where: includeInactive ? {} : { isActive: true },
       orderBy: { sortOrder: 'asc' },
     });
+
+    await this.cache.set(cacheKey, categories, CATEGORIES_CACHE_TTL);
+    return categories;
   }
 
   async findBySlug(slug: string): Promise<Category> {
+    const cacheKey = `${CATEGORIES_CACHE_PREFIX}${slug}`;
+    const cached = await this.cache.get<Category>(cacheKey);
+    if (cached) return cached;
+
     const category = await this.prisma.category.findUnique({
       where: { slug },
     });
@@ -24,6 +44,7 @@ export class CategoriesService {
       throw new NotFoundException('Categoria não encontrada');
     }
 
+    await this.cache.set(cacheKey, category, CATEGORIES_CACHE_TTL);
     return category;
   }
 
@@ -65,6 +86,7 @@ export class CategoriesService {
     });
 
     this.logger.log(`Category created: ${category.name} (${category.id})`);
+    await this.cache.delByPrefix(CATEGORIES_CACHE_PREFIX);
     return category;
   }
 
@@ -96,6 +118,7 @@ export class CategoriesService {
     });
 
     this.logger.log(`Category updated: ${updated.name} (${updated.id})`);
+    await this.cache.delByPrefix(CATEGORIES_CACHE_PREFIX);
     return updated;
   }
 
@@ -114,5 +137,6 @@ export class CategoriesService {
 
     await this.prisma.category.delete({ where: { id } });
     this.logger.log(`Category deleted: ${category.name} (${category.id})`);
+    await this.cache.delByPrefix(CATEGORIES_CACHE_PREFIX);
   }
 }

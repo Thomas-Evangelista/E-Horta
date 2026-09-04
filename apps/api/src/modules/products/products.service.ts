@@ -1,10 +1,15 @@
 import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import { PrismaService } from '../../database/prisma.service';
 import { Prisma, type Product, type ProductUnit } from '@prisma/client';
 import {
   AuditService,
   type AuditContext,
 } from '../audit/audit.service';
+import { CacheService } from '../cache/cache.service';
+
+const PRODUCTS_CACHE_TTL = 60;
+const PRODUCTS_CACHE_PREFIX = 'cache:products:';
 
 export interface ProductFilter {
   category?: string;
@@ -29,6 +34,26 @@ export interface PaginatedProducts {
   };
 }
 
+const productDetailInclude = {
+  category: { select: { id: true, name: true, slug: true } },
+  inventory: { select: { quantity: true, reservedQuantity: true, minimumStock: true } },
+  productImages: { orderBy: { sortOrder: 'asc' } },
+  reviews: {
+    where: { status: 'APPROVED' },
+    select: {
+      id: true,
+      rating: true,
+      comment: true,
+      createdAt: true,
+      user: { select: { id: true, name: true } },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 10,
+  },
+} satisfies Prisma.ProductInclude;
+
+type ProductDetail = Prisma.ProductGetPayload<{ include: typeof productDetailInclude }>;
+
 @Injectable()
 export class ProductsService {
   private readonly logger = new Logger(ProductsService.name);
@@ -36,9 +61,14 @@ export class ProductsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly cache: CacheService,
   ) {}
 
   async findAll(filters: ProductFilter): Promise<PaginatedProducts> {
+    const cacheKey = this.productsListKey(filters);
+    const cached = await this.cache.get<PaginatedProducts>(cacheKey);
+    if (cached) return cached;
+
     const page = filters.page ?? 1;
     const limit = Math.min(filters.limit ?? 20, 100);
     const skip = (page - 1) * limit;
@@ -117,7 +147,7 @@ export class ProductsService {
 
     const withRatings = await this.attachRatings(products);
 
-    return {
+    const result: PaginatedProducts = {
       products: withRatings,
       meta: {
         page,
@@ -126,6 +156,29 @@ export class ProductsService {
         totalPages: Math.ceil(total / limit),
       },
     };
+
+    await this.cache.set(cacheKey, result, PRODUCTS_CACHE_TTL);
+    return result;
+  }
+
+  private productsListKey(filters: ProductFilter): string {
+    const payload = {
+      category: filters.category ?? null,
+      minPrice: filters.minPrice ?? null,
+      maxPrice: filters.maxPrice ?? null,
+      search: (filters.search ?? '').trim().toLowerCase() || null,
+      featured: filters.featured ?? null,
+      available: filters.available ?? null,
+      promotion: filters.promotion ?? null,
+      sort: filters.sort ?? 'newest',
+      page: filters.page ?? 1,
+      limit: Math.min(filters.limit ?? 20, 100),
+    };
+    const hash = createHash('sha256')
+      .update(JSON.stringify(payload))
+      .digest('hex')
+      .slice(0, 24);
+    return `${PRODUCTS_CACHE_PREFIX}list:${hash}`;
   }
 
   /**
@@ -214,32 +267,21 @@ export class ProductsService {
     };
   }
 
-  async findBySlug(slug: string) {
+  async findBySlug(slug: string): Promise<ProductDetail> {
+    const cacheKey = `${PRODUCTS_CACHE_PREFIX}${slug}`;
+    const cached = await this.cache.get<ProductDetail>(cacheKey);
+    if (cached) return cached;
+
     const product = await this.prisma.product.findUnique({
       where: { slug },
-      include: {
-        category: { select: { id: true, name: true, slug: true } },
-        inventory: { select: { quantity: true, reservedQuantity: true, minimumStock: true } },
-        productImages: { orderBy: { sortOrder: 'asc' } },
-        reviews: {
-          where: { status: 'APPROVED' },
-          select: {
-            id: true,
-            rating: true,
-            comment: true,
-            createdAt: true,
-            user: { select: { id: true, name: true } },
-          },
-          orderBy: { createdAt: 'desc' },
-          take: 10,
-        },
-      },
+      include: productDetailInclude,
     });
 
     if (!product) {
       throw new NotFoundException('Produto não encontrado');
     }
 
+    await this.cache.set(cacheKey, product, PRODUCTS_CACHE_TTL);
     return product;
   }
 
@@ -427,6 +469,7 @@ export class ProductsService {
     });
 
     this.logger.log(`Product created: ${product.name} (${product.id})`);
+    await this.cache.delByPrefix(PRODUCTS_CACHE_PREFIX);
     return product;
   }
 
@@ -524,6 +567,7 @@ export class ProductsService {
     }
 
     this.logger.log(`Product updated: ${updated.name} (${updated.id})`);
+    await this.cache.delByPrefix(PRODUCTS_CACHE_PREFIX);
     return updated;
   }
 
@@ -557,5 +601,6 @@ export class ProductsService {
     });
 
     this.logger.log(`Product deleted: ${product.name} (${product.id})`);
+    await this.cache.delByPrefix(PRODUCTS_CACHE_PREFIX);
   }
 }
