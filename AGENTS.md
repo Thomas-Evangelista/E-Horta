@@ -80,6 +80,21 @@ Ao receber uma nova solicitação, adicione uma entrada neste formato:
 - **Verificação**: como foi validada (lint/typecheck/testes/E2E)
 ```
 
+### 2026-09-04 — Otimização de imagens no frontend (Fase 28, item 4 do roadmap)
+
+- **Status**: `concluída`
+- **Origem**: pedido do usuário ("Prossiga para a próxima fase") — continuação da Fase 28; próximo item do roadmap foi **Otimização de imagens**.
+- **Solicitação**: substituir todas as `<img>` por `<Image>` do Next.js com `sizes` responsivo, `placeholder="blur"`, `priority` só na imagem above-the-fold, e habilitar WebP/AVIF.
+- **Decisões**:
+  - Só existiam 4 `<img>` no web: `product-card` (catálogo/grid/carousel), página do produto (LCP), miniatura do carrinho e miniatura da tabela admin. `imageUrl` é URL externa digitada no admin (sem upload no backend) — MinIO `http://localhost:9000` em dev, CDN `https` em produção.
+  - `remotePatterns` ganhou `http://localhost` e `http://127.0.0.1` (dev); `https:*` já cobria produção. `images.formats` habilitou `avif` + `webp`.
+  - `lib/image.ts`: `imagePlaceholder(seed)` → `blurDataURL` SVG determinístico por nome do produto (gradiente "horta"), codificado com `encodeURIComponent` (sem `Buffer`, roda em browser e SSR). next/image exige `blurDataURL` como data URI válida.
+  - LCP (produto): `priority` substitui `loading="eager" fetchPriority="high"`. Demais imagens: lazy (padrão do next/image). Dimensões fixas (`width`/`height`) evitam CLS.
+  - **OOM no vitest**: `next/image` carregado em workers paralelos estourava memória (V8 fatal) no jsdom (máquina 8GB) — corrigido mockando `next/image` no `vitest.setup.ts` (renderiza `<img>` simples), mesmo padrão do mock de framer-motion já existente.
+  - **Build no Windows**: `next build` compila OK, mas o passo `standalone` falha com `EPERM` ao criar symlink no `.next/standalone` (ambiente: sem privilégio de symlink; não relacionado ao código). Verificar com Developer Mode se necessário.
+- **Ações tomadas**: `next.config.mjs`, `lib/image.ts`, 4 componentes com `<Image>`, mock em `vitest.setup.ts`, docs (CHANGELOG + spec 28).
+- **Verificação**: `pnpm lint` 0 erros; `pnpm typecheck` limpo; `pnpm test` web 21 suítes/131 testes (suíte paralela estável; antes OOMava após a mudança).
+
 ### 2026-09-04 — Índices Prisma compostos (Fase 28, item 3 do roadmap)
 
 - **Status**: `concluída`

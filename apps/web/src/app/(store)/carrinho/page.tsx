@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -197,7 +198,14 @@ export default function CarrinhoPage() {
                   tabIndex={-1}
                 >
                   {item.imageUrl ? (
-                    <img src={item.imageUrl} alt="" className="h-full w-full object-cover" />
+                    <Image
+                      src={item.imageUrl}
+                      alt=""
+                      width={80}
+                      height={80}
+                      sizes="80px"
+                      className="h-full w-full object-cover"
+                    />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-2xl">🥕</div>
                   )}

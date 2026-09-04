@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Check, Plus, Star } from 'lucide-react';
@@ -8,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/feedback/toast';
 import { friendlyMessage } from '@/lib/errors';
 import { formatDiscount, formatPrice } from '@/lib/format';
+import { imagePlaceholder } from '@/lib/image';
 import { useAddToCart } from '@/hooks/use-cart';
 import type { Product } from '@/types/api';
 
@@ -22,10 +24,14 @@ function ProductImage({ product }: { product: Product }) {
           🥕
         </div>
       ) : (
-        <img
+        <Image
           src={src}
           alt={`Foto do produto ${product.name}`}
-          loading="lazy"
+          width={600}
+          height={600}
+          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+          placeholder="blur"
+          blurDataURL={imagePlaceholder(product.name)}
           className="h-full w-full object-cover transition-transform duration-200 hover:scale-105"
           onError={() => setFailed(true)}
         />

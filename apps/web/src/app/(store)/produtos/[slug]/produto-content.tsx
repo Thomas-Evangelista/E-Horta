@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Check, ChevronLeft, Minus, Plus } from 'lucide-react';
@@ -13,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/feedback/toast';
 import { friendlyMessage } from '@/lib/errors';
 import { formatDiscount, formatDate, formatPrice } from '@/lib/format';
+import { imagePlaceholder } from '@/lib/image';
 import { useAddToCart } from '@/hooks/use-cart';
 import { useProduct, useRecommendations } from '@/hooks/use-products';
 import { useProductReviews } from '@/hooks/use-reviews';
@@ -146,13 +148,16 @@ export function ProdutoContent({ slug }: { slug: string }) {
       <div className="flex flex-col gap-6 md:flex-row md:gap-10">
         <div className="w-full max-w-md shrink-0 overflow-hidden rounded-card bg-cream-100">
           {product.imageUrl ? (
-            <img
+            <Image
               src={product.imageUrl}
               alt={`Foto do produto ${product.name}`}
+              width={800}
+              height={800}
+              sizes="(max-width: 768px) 100vw, 50vw"
+              priority
+              placeholder="blur"
+              blurDataURL={imagePlaceholder(product.name)}
               className="aspect-square w-full object-cover"
-              loading="eager"
-              fetchPriority="high"
-              decoding="async"
             />
           ) : (
             <div className="flex aspect-square w-full items-center justify-center text-8xl" aria-hidden>

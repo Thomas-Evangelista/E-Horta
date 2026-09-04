@@ -1,6 +1,6 @@
 # 28 — Otimização, Performance e Acessibilidade
 
-**Status:** parcialmente implementada — já concluídos: skip link, `aria-*` em paginação/navegação do admin, `ConfirmDialog` acessível, PWA install prompt, **rate limiting global da API**, **cache Redis do catálogo** e **índices Prisma** (ver `specs/CHANGELOG.md`, "Fase 28 (continuação)" — 2026-09-04). Itens restantes dos primeiros do roadmap — **Performance — Frontend** (imagens/prefetch), PWA completo e restante de **Acessibilidade** — ainda não iniciados.
+**Status:** parcialmente implementada — já concluídos: skip link, `aria-*` em paginação/navegação do admin, `ConfirmDialog` acessível, PWA install prompt, **rate limiting global da API**, **cache Redis do catálogo**, **índices Prisma** e **otimização de imagens** (ver `specs/CHANGELOG.md`, "Fase 28 (continuação)" — 2026-09-04). Itens restantes dos primeiros do roadmap — **Prefetch de rotas / bundle**, **PWA completo** e restante de **Acessibilidade** — ainda não iniciados.
 **Objetivo:** fechar os gaps de performance, PWA e acessibilidade identificados nas fases anteriores, preparando o projeto para produção.
 
 ---
@@ -38,10 +38,10 @@
 
 ## 2. Performance — Frontend
 
-### Otimização de imagens
+### Otimização de imagens — ✅ concluído
 
 - Substituir todas as `<img>` por `<Image>` do Next.js com:
-  - `sizes` responsivo (ex: `(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw`)
+  - `sizes` responsivo (ex: `(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw`)
   - `placeholder="blur"` com `blurDataURL` (placeholder de 10px)
   - `priority="true"` apenas na imagem hero/above-the-fold
 - Conversão automática para WebP/AVIF via Next.js Image Optimization
@@ -206,10 +206,11 @@
 2. **Cache Redis** (API) — melhoria de performance visível
 3. **Índices Prisma** — queries lentas
 4. **Otimização de imagens** (frontend) — impacto em LCP
-5. **PWA completo** (service worker) — funcionalidade offline
-6. **Acessibilidade** (componentes) — contraste, ARIA, focus
-7. **UX polish** (modais, skeletons, toasts) — experiência final
-8. **Testes** — validar tudo
+5. **Prefetch de rotas / bundle** (frontend)
+6. **PWA completo** (service worker) — funcionalidade offline
+7. **Acessibilidade** (componentes) — contraste, ARIA, focus
+8. **UX polish** (modais, skeletons, toasts) — experiência final
+9. **Testes** — validar tudo
 
 ---
 

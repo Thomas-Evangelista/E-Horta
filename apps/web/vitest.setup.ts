@@ -24,6 +24,28 @@ Object.defineProperty(window, 'matchMedia', {
 
 globalThis.requestAnimationFrame = (cb: FrameRequestCallback) => setTimeout(cb, 0);
 
+// next/image renderiza como <img> simples em jsdom (evita carregar o otimizador
+// do Next em cada worker, que estourava a memória com a suíte paralela).
+vi.mock('next/image', () => {
+  const NEXT_IMAGE_STRIP = [
+    'priority',
+    'placeholder',
+    'blurDataURL',
+    'fill',
+    'quality',
+    'unoptimized',
+    'onLoadingComplete',
+  ] as const;
+
+  const Image = forwardRef<HTMLImageElement, Record<string, unknown>>((props, ref) => {
+    const imgProps = { ...props };
+    for (const key of NEXT_IMAGE_STRIP) delete imgProps[key];
+    return createElement('img', { ref, ...imgProps });
+  });
+  Image.displayName = 'NextImage';
+  return { default: Image };
+});
+
 // framer-motion em jsdom não anima de forma determinística; renderiza direto.
 vi.mock('framer-motion', async () => {
   const cache = new Map<string, ComponentType<Record<string, unknown>>>();

@@ -16,6 +16,7 @@ import { useToast } from '@/components/admin/feedback/toast';
 import { friendlyMessage } from '@/lib/errors';
 import { Plus, Search, Pencil } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useState } from 'react';
 
 type Product = {
@@ -112,7 +113,7 @@ export default function ProductsPage() {
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-3">
                         {p.imageUrl ? (
-                          <img src={p.imageUrl} alt="" className="h-10 w-10 rounded-lg object-cover" />
+                          <Image src={p.imageUrl} alt="" width={40} height={40} sizes="40px" className="h-10 w-10 rounded-lg object-cover" />
                         ) : (
                           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-cream-100 text-xs text-ink-400">img</div>
                         )}

@@ -4,6 +4,27 @@ Registro de modificações do projeto, organizado por fase de implementação.
 
 ---
 
+## Fase 28 (continuação) — Otimização de imagens no frontend
+
+**Escopo:** quarto item de performance do roadmap de `specs/28-otimizacao-performance-acessibilidade.md` — migrar todas as `<img>` para o `next/image` (otimização automática WebP/AVIF, `sizes` responsivo, `placeholder="blur"` e `priority` só no LCP).
+
+### Imagens (web)
+
+- `next.config.mjs`: habilitado `images.formats = ['image/avif', 'image/webp']` e novos `remotePatterns` para `http://localhost` e `http://127.0.0.1` (MinIO do dev; o `https` wildcard já cobria produção/CDN).
+- Novo helper [`lib/image.ts`](../apps/web/src/lib/image.ts): `imagePlaceholder(seed)` gera `blurDataURL` SVG determinístico (gradiente suave de tons "horta" derivado do nome do produto) + `DEFAULT_IMAGE_PLACEHOLDER` — sem depender de `Buffer` (compatível browser/SSR).
+- `product-card.tsx` (catálogo/grid/carousel): `<Image width={600} height={600}>` com `sizes="(max-width:640px) 50vw, (max-width:1024px) 33vw, 25vw"`, `placeholder="blur"`, mantendo `onError` (fallback 🥕).
+- `produtos/[slug]/produto-content.tsx` (LCP): `<Image width={800} height={800}>` com **`priority`**, `sizes="(max-width:768px) 100vw, 50vw"` e `placeholder="blur"` — substitui o `loading="eager" fetchPriority="high"` do `<img>`.
+- Carrinho e admin produtos (miniaturas): `<Image width={80}/{40} height={80}/{40}>` com `sizes` fixo e `alt=""` (decorativas).
+- `vitest.setup.ts`: mock de `next/image` (renderiza `<img>` simples) — sem isso a suíte paralela estourava memória (V8 fatal) nos workers jsdom ao carregar o otimizador do Next (máquina 8GB). Padrão igual ao mock de framer-motion já existente.
+
+### Verificação
+
+- `pnpm lint`: 0 erros; `pnpm typecheck` (monorepo): limpo.
+- `pnpm test` (web, vitest): 21 suítes / 131 testes (mock de `next/image` adicionado; suíte paralela estável, antes OOMava).
+- `pnpm --filter @e-horta/web build`: compilação OK; o passo final de `standalone` falha por `EPERM` em symlink no Windows (ambiente — requer privilégio/Developer Mode; não relacionado à mudança).
+
+---
+
 ## Fase 28 (continuação) — Índices Prisma
 
 **Escopo:** terceiro item de performance do roadmap de `specs/28-otimizacao-performance-acessibilidade.md` — índices compostos para as queries mais frequentes de listagem/ordenação em `orders`, `audit_logs`, `reviews` e `notifications`.
