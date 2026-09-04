@@ -4,6 +4,77 @@ Registro de modificações do projeto, organizado por fase de implementação.
 
 ---
 
+## Fase 28 (parcial) — Avaliações, notificações paginadas, dashboard com tendências e acessibilidade
+
+**Escopo:** itens antecipados do roadmap de `specs/28-otimizacao-performance-acessibilidade.md` (seção de acessibilidade e parte de performance de UX), implementados junto com melhorias de avaliações/notificações que não estavam previamente registradas.
+
+### Avaliações (API + Web)
+
+- `products.service.ts`: nova `attachRatings()` — anexa média e contagem de avaliações aprovadas (`Review.status = APPROVED`) aos produtos retornados por `findAll`, `findFeatured`, `findBestSellers`, `findOnPromotion` e `findRecommendations`, usada para exibir nota nos cards de produto ([`product-card.tsx`](../apps/web/src/components/product/product-card.tsx)).
+- `use-reviews.ts`: novos hooks `useProductReviews` (lista + `ReviewSummaryDTO` com distribuição de notas) e `useMyReviews`/`useDeleteReview` (minhas avaliações, com exclusão); novo componente [`review-summary.tsx`](../apps/web/src/components/product/review-summary.tsx) na página de produto.
+
+### Notificações vinculadas a pedidos e paginação
+
+- Migration `20260904000916_add_notification_order_id`: coluna `order_id` (nullable, `ON DELETE SET NULL`) em `notifications`, permitindo que uma notificação linke para o pedido de origem.
+- `notifications.service.ts`/`notifications.processor.ts`: passam a gravar `orderId` ao notificar eventos de pedido.
+- `use-notifications.ts`: `useNotifications` migrado de `useQuery` para `useInfiniteQuery` (paginação de 20 em 20) na página [`notificacoes`](../apps/web/src/app/(store)/notificacoes/page.tsx).
+
+### Dashboard admin — tendências e pedidos recentes
+
+- `admin.service.ts`/`admin-dashboard.controller.ts`: novos endpoints `GET /admin/dashboard/trends` (série diária de pedidos/receita, 1-90 dias) e `GET /admin/dashboard/recent-orders` (últimos pedidos).
+- Novo componente [`dashboard-trend-chart.tsx`](../apps/web/src/components/admin/dashboard-trend-chart.tsx) (biblioteca `recharts`, nova dependência de `apps/web`) exibido em `/admin`.
+
+### Acessibilidade (spec 28) e PWA
+
+- Novo [`skip-link.tsx`](../apps/web/src/components/ui/skip-link.tsx) ("Pular para o conteúdo") no layout da loja e do admin, com `id="conteudo-principal"` no `<main>` de ambos.
+- `aria-current`/`aria-label` adicionados na navegação do admin (`sidebar.tsx`, `pagination.tsx`) e no componente de paginação compartilhado ([`ui/pagination.tsx`](../apps/web/src/components/ui/pagination.tsx), que virou `<nav aria-label="Paginação">`).
+- Novo [`ConfirmDialog`](../apps/web/src/components/admin/ui/confirm-dialog.tsx) substitui `window.confirm()` nas exclusões do admin (categorias, produtos, promoções) — mais acessível e consistente com o design system.
+- Novo [`install-prompt.tsx`](../apps/web/src/components/pwa/install-prompt.tsx): banner de instalação do PWA a partir do evento `beforeinstallprompt`.
+- Nova página de listagem [`(store)/produtos`](../apps/web/src/app/(store)/produtos/produtos-content.tsx) com paginação/filtros usando os novos componentes `ui/pagination` e `ui/select`.
+
+### Verificação
+
+- `pnpm lint` / `pnpm typecheck`: sem erros. Ver `specs/28-otimizacao-performance-acessibilidade.md` para os itens restantes do roadmap (cache Redis, rate limiting, otimização de imagens, etc.), ainda não iniciados.
+
+---
+
+## Fase 27 — Fluxo de senha completo + gestão de status de usuários no Admin
+
+**Escopo:** completar o ciclo de senha (Recuperar/Redefinir via e-mail + Alterar senha) e adicionar a gestão de status de clientes no painel administrativo.
+
+### Recuperação e redefinição de senha (API)
+
+- Novo modelo Prisma `PasswordResetToken` (`prisma/schema.prisma`): campos `id`, `userId`, `tokenHash` (SHA-256), `expiresAt`, `usedAt`, `createdAt`; índice em `userId`; relação `onDelete: Cascade` com `User`. Migration `20260903193944_y` (nome genérico por engano no `prisma migrate dev --name`; conteúdo é a criação de `password_reset_tokens`).
+- `apps/api/src/modules/auth/auth.validation.ts`: adicionado `changePasswordSchema` (`currentPassword` ≥ 1, `newPassword` 8-128, `confirmPassword` + refines de correspondência e de diferença da atual) e tipos `ForgotPasswordDto`/`ResetPasswordDto`/`ChangePasswordDto`.
+- `apps/api/src/modules/auth/auth.service.ts`:
+  - `forgotPassword(dto)`: sucesso silencioso para conta inexistente/inativa (anti-enumeração); token `randomBytes(32)` hash em SHA-256, inserido com expiração de 1h via `$executeRaw`; envia e-mail com link `${SITE_URL}/redefinir-senha?token=...`.
+  - `resetPassword(dto)`: valida token válido/não usado; em transação atualiza `password_hash`, marca token usado e revoga `refresh_tokens`.
+  - `changePassword(userId, dto)`: valida senha atual (bcrypt), atualiza `password_hash`, revoga `refresh_tokens` e audita `PASSWORD_CHANGED`.
+- `apps/api/src/modules/auth/auth.controller.ts`: 3 novos endpoints — `POST /auth/forgot-password` (público), `POST /auth/reset-password` (público), `POST /auth/change-password` (autenticado).
+- `config.validation.ts` + `.env`/`.env.example`: nova variável `SITE_URL` (default `http://localhost:3000`) para montar o link de redefinição.
+- `notifications.module.ts`: passou a exportar `MailerService` (necessário para injeção no `AuthService`).
+
+### Recuperação/redefinição na loja (web)
+
+- `(store)/esqueci-senha/`: formulário de e-mail → tela de confirmação ("Se este e-mail estiver cadastrado...") com link de volta ao login.
+- `(store)/redefinir-senha/`: lê `?token=`, campos Nova senha + Confirmação com `PasswordStrengthMeter`; sucesso redireciona para `/login`; token ausente mostra "Solicitar novo link".
+- Link "Esqueci minha senha?" adicionado em `(store)/login/login-content.tsx`.
+
+### Alterar senha na conta (web)
+
+- `hooks/use-account.ts`: novo `useChangePassword()` (POST `/auth/change-password`).
+- `(store)/conta/page.tsx`: nova seção colapsável "Alterar senha" (senha atual + nova + confirmação com `PasswordStrengthMeter`); ao salvar, limpa a sessão na store e informa para logar novamente.
+
+### Gestão de status no Admin (web)
+
+- `(admin)/usuarios/page.tsx`: coluna "Ações" com botão "Gerenciar" (apenas `role = CUSTOMER`), modal de confirmação com ações Ativar/Inativar/Bloquear conforme o status atual, e `useMutation` para `PATCH /admin/users/:id/status` com invalidação de `queryKeys.users(...)` e toast de sucesso/erro. Os endpoints de lista e status já existiam na API (`admin-users.controller.ts` + `users.service.findAllForAdmin`/`updateStatusForAdmin`).
+
+### Verificação
+
+- `pnpm lint`: 0 erros. `pnpm typecheck` (api + web): OK. `pnpm test` — API: 226/226, Web (vitest): 118/118.
+
+---
+
 ## Fase 26 — Fusão do Admin no Web (frontend único) *(atual)*
 
 **Escopo:** eliminar `apps/admin` como app Next.js separado — motivado pela
