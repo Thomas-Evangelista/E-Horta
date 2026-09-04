@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Check, Plus } from 'lucide-react';
+import { Check, Plus, Star } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/feedback/toast';
 import { friendlyMessage } from '@/lib/errors';
@@ -63,11 +63,20 @@ export function ProductCard({ product }: { product: Product }) {
       </Link>
 
       <div className="flex flex-1 flex-col gap-1 p-3">
-        {discount > 0 && (
-          <Badge tone="accent" className="self-start">
-            -{discount}%
-          </Badge>
-        )}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {discount > 0 && (
+            <Badge tone="accent" className="self-start">
+              -{discount}%
+            </Badge>
+          )}
+          {product.rating && product.rating.count > 0 && (
+            <span className="inline-flex items-center gap-0.5 self-start rounded-full bg-cream-100 px-1.5 py-0.5 text-xs font-semibold text-ink-700">
+              <Star size={11} aria-hidden className="fill-amber-400 text-amber-400" />
+              {product.rating.average.toFixed(1)}
+              <span className="text-ink-400">({product.rating.count})</span>
+            </span>
+          )}
+        </div>
         <Link href={`/produtos/${product.slug}`} className="text-sm font-medium leading-snug text-ink-800 hover:text-accent-600">
           {product.name}
         </Link>

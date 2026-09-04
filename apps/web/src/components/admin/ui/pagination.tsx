@@ -10,10 +10,11 @@ export function Pagination({ page, totalPages, onPageChange }: PaginationProps) 
   if (totalPages <= 1) return null;
 
   return (
-    <div className="flex items-center justify-center gap-1 py-4">
+    <nav aria-label="Paginação" className="flex items-center justify-center gap-1 py-4">
       <button
         onClick={() => onPageChange(page - 1)}
         disabled={page <= 1}
+        aria-label="Página anterior"
         className="h-9 rounded-lg px-3 text-sm font-medium text-ink-600 hover:bg-cream-100 disabled:opacity-40"
       >
         Anterior
@@ -33,6 +34,8 @@ export function Pagination({ page, totalPages, onPageChange }: PaginationProps) 
           <button
             key={p}
             onClick={() => onPageChange(p)}
+            aria-label={`Página ${p}`}
+            aria-current={p === page ? 'page' : undefined}
             className={`h-9 w-9 rounded-lg text-sm font-medium transition-colors ${
               p === page ? 'bg-accent-500 text-white' : 'text-ink-600 hover:bg-cream-100'
             }`}
@@ -44,10 +47,11 @@ export function Pagination({ page, totalPages, onPageChange }: PaginationProps) 
       <button
         onClick={() => onPageChange(page + 1)}
         disabled={page >= totalPages}
+        aria-label="Próxima página"
         className="h-9 rounded-lg px-3 text-sm font-medium text-ink-600 hover:bg-cream-100 disabled:opacity-40"
       >
         Próxima
       </button>
-    </div>
+    </nav>
   );
 }

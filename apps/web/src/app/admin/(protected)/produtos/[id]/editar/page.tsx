@@ -1,6 +1,6 @@
 'use client';
 
-import { use } from 'react';
+import { use, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -15,6 +15,7 @@ import { Input } from '@/components/admin/ui/input';
 import { Select } from '@/components/admin/ui/select';
 import { Textarea } from '@/components/admin/ui/textarea';
 import { Card, CardContent, CardHeader } from '@/components/admin/ui/card';
+import { ConfirmDialog } from '@/components/admin/ui/confirm-dialog';
 import { PageHeader } from '@/components/admin/ui/page-header';
 import { FullPageSpinner } from '@/components/admin/ui/skeleton';
 import { ArrowLeft } from 'lucide-react';
@@ -53,6 +54,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
   const router = useRouter();
   const { toast } = useToast();
   const qc = useQueryClient();
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const { data: product, isLoading: loadingProduct } = useQuery({
     queryKey: queryKeys.productDetail(id),
@@ -196,7 +198,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
         </Card>
 
         <div className="flex justify-between">
-          <Button variant="danger" type="button" onClick={() => { if (confirm('Remover este produto?')) deleteMutation.mutate(); }} loading={deleteMutation.isPending}>
+          <Button variant="danger" type="button" onClick={() => setConfirmOpen(true)} loading={deleteMutation.isPending}>
             Remover
           </Button>
           <div className="flex gap-3">
@@ -205,6 +207,17 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
           </div>
         </div>
       </form>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={() => { setConfirmOpen(false); deleteMutation.mutate(); }}
+        title="Remover produto"
+        message="Tem certeza que deseja remover este produto? Esta ação não pode ser desfeita."
+        variant="danger"
+        confirmLabel="Remover"
+        loading={deleteMutation.isPending}
+      />
     </div>
   );
 }

@@ -11,26 +11,43 @@ describe('Pagination', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('desabilita "Anterior" na primeira página', () => {
+  it('renderiza nav com aria-label de paginacao', () => {
     render(<Pagination page={1} totalPages={3} onPageChange={() => undefined} />);
-    expect(screen.getByRole('button', { name: 'Anterior' })).toBeDisabled();
+    expect(screen.getByRole('navigation', { name: 'Paginação' })).toBeInTheDocument();
   });
 
-  it('desabilita "Próxima" na última página', () => {
+  it('desabilita "Anterior" na primeira pagina', () => {
+    render(<Pagination page={1} totalPages={3} onPageChange={() => undefined} />);
+    expect(screen.getByRole('button', { name: 'Página anterior' })).toBeDisabled();
+  });
+
+  it('desabilita "Proxima" na ultima pagina', () => {
     render(<Pagination page={3} totalPages={3} onPageChange={() => undefined} />);
-    expect(screen.getByRole('button', { name: 'Próxima' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Próxima página' })).toBeDisabled();
   });
 
   it('chama onPageChange ao navegar', async () => {
     const onPageChange = vi.fn();
     render(<Pagination page={2} totalPages={5} onPageChange={onPageChange} />);
-    await userEvent.click(screen.getByRole('button', { name: 'Próxima' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Próxima página' }));
     expect(onPageChange).toHaveBeenCalledWith(3);
   });
 
-  it('mostra janela de páginas ao redor da página atual', () => {
+  it('marca a pagina atual com aria-current', () => {
+    render(<Pagination page={2} totalPages={5} onPageChange={() => undefined} />);
+    const currentPage = screen.getByRole('button', { name: 'Página 2' });
+    expect(currentPage).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('nao marca paginas nao atuais com aria-current', () => {
+    render(<Pagination page={2} totalPages={5} onPageChange={() => undefined} />);
+    const otherPage = screen.getByRole('button', { name: 'Página 1' });
+    expect(otherPage).not.toHaveAttribute('aria-current');
+  });
+
+  it('mostra janela de paginas ao redor da pagina atual', () => {
     render(<Pagination page={5} totalPages={10} onPageChange={() => undefined} />);
-    expect(screen.getByRole('button', { name: '2' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '8' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Página 2' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Página 8' })).toBeInTheDocument();
   });
 });

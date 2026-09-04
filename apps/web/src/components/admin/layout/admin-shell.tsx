@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useSessionStore } from '@/stores/session';
 import { Sidebar } from '@/components/admin/layout/sidebar';
 import { FullPageSpinner } from '@/components/admin/ui/skeleton';
+import { SkipLink } from '@/components/ui/skip-link';
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -25,6 +26,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-dvh">
+      <SkipLink />
       <Sidebar />
       <div className="transition-all lg:pl-[260px]">
         <header className="sticky top-0 z-header flex h-14 items-center border-b border-cream-200 bg-cream-50/95 px-6 backdrop-blur lg:pl-6">
@@ -32,7 +34,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             <p className="text-sm text-ink-400">Olá, <span className="font-medium text-ink-800">{user.name}</span></p>
           </div>
         </header>
-        <main className="p-4 sm:p-6">{children}</main>
+        <main id="conteudo-principal" className="p-4 sm:p-6">{children}</main>
       </div>
     </div>
   );

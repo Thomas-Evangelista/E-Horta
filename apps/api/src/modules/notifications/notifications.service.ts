@@ -13,6 +13,7 @@ export interface NotificationSummary {
   title: string;
   message: string;
   read: boolean;
+  orderId: string | null;
   createdAt: Date;
 }
 

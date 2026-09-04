@@ -98,7 +98,8 @@ model User {
   reviews       Review[]
   notifications Notification[]
   auditLogs     AuditLog[]
-  refreshTokens RefreshToken[]
+  refreshTokens     RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
 
   @@map("users")
 }
@@ -293,6 +294,7 @@ model Order {
   shipping        Shipping?
   promotionUsages PromotionUsage[]
   reviews         Review[]
+  notifications   Notification[]
 
   @@index([userId])
   @@index([status])
@@ -375,12 +377,14 @@ model Review {
 model Notification {
   id        String   @id @default(uuid()) @db.Uuid
   userId    String   @map("user_id") @db.Uuid
+  orderId   String?  @map("order_id") @db.Uuid
   title     String
   message   String
   read      Boolean  @default(false)
   createdAt DateTime @default(now()) @map("created_at")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@map("notifications")
@@ -396,6 +400,20 @@ model RefreshToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("refresh_tokens")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
 }
 
 model WebhookEvent {

@@ -1,8 +1,10 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/api-client';
 import type { NotificationDTO } from '@/types/api';
+
+const PAGE_SIZE = 20;
 
 export function useUnreadNotificationsCount(enabled: boolean) {
   return useQuery({
@@ -19,16 +21,24 @@ export function useUnreadNotificationsCount(enabled: boolean) {
 }
 
 export function useNotifications(enabled: boolean) {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: ['notifications', 'list'],
     enabled,
     retry: 1,
     refetchOnMount: 'always',
-    queryFn: async () => {
+    initialPageParam: 1,
+    queryFn: async ({ pageParam }) => {
       const envelope = await apiRequest<NotificationDTO[]>('/notifications', {
-        query: { limit: 50 },
+        query: { page: pageParam, limit: PAGE_SIZE },
       });
-      return envelope.data;
+      return {
+        items: envelope.data ?? [],
+        totalPages: envelope.meta?.totalPages ?? 1,
+      };
+    },
+    getNextPageParam: (lastPage, allPages) => {
+      const nextPage = allPages.length + 1;
+      return nextPage <= lastPage.totalPages ? nextPage : undefined;
     },
   });
 }

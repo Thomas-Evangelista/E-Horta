@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { ServiceWorkerRegister } from '@/components/pwa/service-worker-register';
+import { InstallPrompt } from '@/components/pwa/install-prompt';
 import { Providers } from './providers';
 import { siteUrl } from '@/lib/seo';
 import './globals.css';
@@ -40,9 +41,13 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR">
+      <head>
+        <link rel="manifest" href="/manifest.webmanifest" />
+      </head>
       <body className="min-h-dvh">
         <ServiceWorkerRegister />
         <Providers>{children}</Providers>
+        <InstallPrompt />
       </body>
     </html>
   );

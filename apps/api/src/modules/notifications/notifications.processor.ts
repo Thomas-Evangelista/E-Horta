@@ -25,6 +25,7 @@ export class NotificationsProcessor {
         userId: data.userId,
         title: template.title,
         message: template.message,
+        orderId: data.data.orderId ?? null,
       },
     });
 

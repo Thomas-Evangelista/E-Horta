@@ -16,6 +16,7 @@ import {
 import { friendlyMessage } from '@/lib/errors';
 import { formatRelativeTime } from '@/lib/format';
 import { useSessionStore } from '@/stores/session';
+import type { NotificationDTO } from '@/types/api';
 
 export default function NotificacoesPage() {
   const router = useRouter();
@@ -44,11 +45,14 @@ export default function NotificacoesPage() {
     }
   }
 
-  function handleNotificationClick(id: string, read: boolean) {
-    if (!read && !markRead.isPending) {
-      markRead.mutate(id, {
+  function handleNotificationClick(notification: NotificationDTO) {
+    if (!notification.read && !markRead.isPending) {
+      markRead.mutate(notification.id, {
         onError: () => toast('error', 'Não foi possível marcar como lida.'),
       });
+    }
+    if (notification.orderId) {
+      router.push(`/pedidos/${notification.orderId}`);
     }
   }
 
@@ -81,7 +85,7 @@ export default function NotificacoesPage() {
     );
   }
 
-  const notifications = notificationsQuery.data ?? [];
+  const notifications = (notificationsQuery.data?.pages ?? []).flatMap((page) => page.items);
   const unreadCount = notifications.filter((notification) => !notification.read).length;
 
   return (
@@ -126,7 +130,7 @@ export default function NotificacoesPage() {
             >
               <button
                 type="button"
-                onClick={() => handleNotificationClick(notification.id, notification.read)}
+                onClick={() => handleNotificationClick(notification)}
                 aria-label={
                   notification.read
                     ? notification.title
@@ -159,6 +163,16 @@ export default function NotificacoesPage() {
             </motion.li>
           ))}
         </ul>
+      )}
+      {notifications.length > 0 && notificationsQuery.hasNextPage && (
+        <Button
+          variant="outline"
+          className="self-center px-8"
+          loading={notificationsQuery.isFetchingNextPage}
+          onClick={() => void notificationsQuery.fetchNextPage()}
+        >
+          Carregar mais
+        </Button>
       )}
     </div>
   );

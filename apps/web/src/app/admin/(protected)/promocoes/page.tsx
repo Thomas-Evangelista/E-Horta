@@ -15,6 +15,7 @@ import { Button } from '@/components/admin/ui/button';
 import { Input } from '@/components/admin/ui/input';
 import { Select } from '@/components/admin/ui/select';
 import { Modal } from '@/components/admin/ui/modal';
+import { ConfirmDialog } from '@/components/admin/ui/confirm-dialog';
 import { Pagination } from '@/components/admin/ui/pagination';
 import { useToast } from '@/components/admin/feedback/toast';
 import { friendlyMessage } from '@/lib/errors';
@@ -53,6 +54,7 @@ export default function PromotionsPage() {
   const [page, setPage] = useState(1);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Promotion | null>(null);
+  const [deleting, setDeleting] = useState<Promotion | null>(null);
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: queryKeys.promotions({ page }),
@@ -133,7 +135,7 @@ export default function PromotionsPage() {
                     <td className="px-5 py-3 text-right">
                       <div className="flex justify-end gap-1">
                         <Button variant="ghost" size="icon" onClick={() => openEdit(p)}><Pencil size={14} /></Button>
-                        <Button variant="ghost" size="icon" className="text-red-600" onClick={() => { if (confirm('Remover?')) deleteMutation.mutate(p.id); }}><Trash2 size={14} /></Button>
+                        <Button variant="ghost" size="icon" className="text-red-600" onClick={() => setDeleting(p)}><Trash2 size={14} /></Button>
                       </div>
                     </td>
                   </tr>
@@ -159,6 +161,17 @@ export default function PromotionsPage() {
           <Input label="Limite de uso" type="number" error={errors.usageLimit?.message} {...register('usageLimit', { valueAsNumber: true })} />
         </form>
       </Modal>
+
+      <ConfirmDialog
+        open={!!deleting}
+        onClose={() => setDeleting(null)}
+        onConfirm={() => { if (deleting) deleteMutation.mutate(deleting.id); setDeleting(null); }}
+        title="Remover promoção"
+        message={`Tem certeza que deseja remover a promoção "${deleting?.code ?? ''}"? Esta ação não pode ser desfeita.`}
+        variant="danger"
+        confirmLabel="Remover"
+        loading={deleteMutation.isPending}
+      />
     </div>
   );
 }

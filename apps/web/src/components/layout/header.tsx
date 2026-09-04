@@ -103,6 +103,21 @@ export function Header() {
             </span>
           </Link>
 
+          <nav className="hidden shrink-0 md:flex" aria-label="Navegação principal">
+            <Link
+              href="/produtos"
+              className="h-10 items-center rounded-xl px-3 text-sm font-medium text-ink-600 hover:bg-cream-100 hover:text-accent-600"
+            >
+              Produtos
+            </Link>
+            <Link
+              href="/categorias"
+              className="hidden h-10 items-center rounded-xl px-3 text-sm font-medium text-ink-600 hover:bg-cream-100 hover:text-accent-600 lg:flex"
+            >
+              Categorias
+            </Link>
+          </nav>
+
           <form role="search" onSubmit={submitSearch} className="ml-auto flex max-w-md flex-1 items-center">
             <label htmlFor="global-search" className="sr-only">
               Buscar produtos

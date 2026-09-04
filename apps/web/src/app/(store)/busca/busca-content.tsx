@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect } from 'react';
 import { ProductGrid } from '@/components/product/product-grid';
 import { ProductGridSkeleton } from '@/components/ui/skeleton';
+import { Pagination } from '@/components/ui/pagination';
 import { friendlyMessage } from '@/lib/errors';
 import { useProductSearch } from '@/hooks/use-products';
 
@@ -51,27 +52,11 @@ export function BuscaContent() {
       {data && data.items.length > 0 && <ProductGrid products={data.items} />}
 
       {data && data.totalPages > 1 && (
-        <nav aria-label="Paginação" className="flex items-center justify-center gap-3 pt-2">
-          <button
-            type="button"
-            disabled={page <= 1}
-            onClick={() => router.push(`/busca?q=${encodeURIComponent(q)}&page=${page - 1}`)}
-            className="rounded-pill border border-cream-300 px-4 py-2 text-sm font-medium disabled:opacity-40"
-          >
-            Anterior
-          </button>
-          <span aria-current="page" className="text-sm font-semibold text-ink-600">
-            Página {page} de {data.totalPages}
-          </span>
-          <button
-            type="button"
-            disabled={page >= data.totalPages}
-            onClick={() => router.push(`/busca?q=${encodeURIComponent(q)}&page=${page + 1}`)}
-            className="rounded-pill border border-cream-300 px-4 py-2 text-sm font-medium disabled:opacity-40"
-          >
-            Próxima
-          </button>
-        </nav>
+        <Pagination
+          page={page}
+          totalPages={data.totalPages}
+          onPageChange={(p) => router.push(`/busca?q=${encodeURIComponent(q)}&page=${p}`)}
+        />
       )}
     </div>
   );

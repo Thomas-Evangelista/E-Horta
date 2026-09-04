@@ -13,6 +13,7 @@ import { Button } from '@/components/admin/ui/button';
 import { Input } from '@/components/admin/ui/input';
 import { Textarea } from '@/components/admin/ui/textarea';
 import { Modal } from '@/components/admin/ui/modal';
+import { ConfirmDialog } from '@/components/admin/ui/confirm-dialog';
 import { useToast } from '@/components/admin/feedback/toast';
 import { friendlyMessage } from '@/lib/errors';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
@@ -37,6 +38,7 @@ export default function CategoriesPage() {
   const qc = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCat, setEditingCat] = useState<Category | null>(null);
+  const [deletingCat, setDeletingCat] = useState<Category | null>(null);
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: queryKeys.categories,
@@ -123,7 +125,7 @@ export default function CategoriesPage() {
                 <Button variant="ghost" size="sm" onClick={() => toggleActive.mutate(cat)}>
                   {cat.isActive ? 'Desativar' : 'Ativar'}
                 </Button>
-                <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700" onClick={() => { if (confirm('Remover categoria?')) deleteMutation.mutate(cat.id); }}>
+                <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700" onClick={() => setDeletingCat(cat)}>
                   <Trash2 size={14} />
                 </Button>
               </div>
@@ -150,6 +152,17 @@ export default function CategoriesPage() {
           <Input label="Ordem" type="number" error={errors.sortOrder?.message} {...register('sortOrder', { valueAsNumber: true })} />
         </form>
       </Modal>
+
+      <ConfirmDialog
+        open={!!deletingCat}
+        onClose={() => setDeletingCat(null)}
+        onConfirm={() => { if (deletingCat) deleteMutation.mutate(deletingCat.id); setDeletingCat(null); }}
+        title="Remover categoria"
+        message={`Tem certeza que deseja remover a categoria "${deletingCat?.name ?? ''}"? Esta ação não pode ser desfeita.`}
+        variant="danger"
+        confirmLabel="Remover"
+        loading={deleteMutation.isPending}
+      />
     </div>
   );
 }

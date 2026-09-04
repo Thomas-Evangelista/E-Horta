@@ -10,6 +10,21 @@ export interface AdminDashboard {
   customers: number;
 }
 
+export interface TrendPoint {
+  date: string;
+  orders: number;
+  revenue: number;
+}
+
+export interface RecentOrder {
+  id: string;
+  orderNumber: string;
+  customer: string;
+  total: number;
+  status: string;
+  createdAt: Date;
+}
+
 @Injectable()
 export class AdminService {
   constructor(private readonly prisma: PrismaService) {}
@@ -50,5 +65,70 @@ export class AdminService {
       activeProducts,
       customers,
     };
+  }
+
+  /**
+   * Tendência diária de pedidos e receita para o gráfico do painel.
+   * Considera apenas pedidos pagos (pagamentos aprovados) para a receita;
+   * conta pedidos criados por dia como volume.
+   */
+  async getTrends(days: number): Promise<TrendPoint[]> {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    start.setDate(start.getDate() - (days - 1));
+
+    const orders = await this.prisma.order.findMany({
+      where: { createdAt: { gte: start } },
+      select: { createdAt: true, total: true, paymentStatus: true },
+    });
+
+    const buckets = new Map<string, { orders: number; revenue: number }>();
+    const cursor = new Date(start);
+    for (let i = 0; i < days; i++) {
+      const key = cursor.toISOString().slice(0, 10);
+      buckets.set(key, { orders: 0, revenue: 0 });
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    for (const order of orders) {
+      const key = order.createdAt.toISOString().slice(0, 10);
+      const bucket = buckets.get(key);
+      if (!bucket) continue;
+      bucket.orders += 1;
+      if (order.paymentStatus === 'APPROVED') {
+        bucket.revenue += order.total.toNumber();
+      }
+    }
+
+    return Array.from(buckets.entries()).map(([date, value]) => ({
+      date,
+      orders: value.orders,
+      revenue: Math.round(value.revenue * 100) / 100,
+    }));
+  }
+
+  /** Pedidos recentes, ordenados por criação, para tabela resumida do painel. */
+  async getRecentOrders(limit = 8): Promise<RecentOrder[]> {
+    const orders = await this.prisma.order.findMany({
+      select: {
+        id: true,
+        orderNumber: true,
+        total: true,
+        status: true,
+        createdAt: true,
+        user: { select: { name: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    });
+
+    return orders.map((order) => ({
+      id: order.id,
+      orderNumber: order.orderNumber,
+      customer: order.user.name,
+      total: order.total.toNumber(),
+      status: order.status,
+      createdAt: order.createdAt,
+    }));
   }
 }

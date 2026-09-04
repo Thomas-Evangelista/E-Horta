@@ -47,6 +47,7 @@ describe('NotificationsProcessor', () => {
         title: 'Pagamento aprovado',
         message:
           'Pagamento do pedido EH-20260823-ABC123 aprovado! Seu pedido entrará em preparo.',
+        orderId: 'order-1',
       },
     });
 

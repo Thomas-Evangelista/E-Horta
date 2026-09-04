@@ -115,8 +115,10 @@ export class ProductsService {
       this.prisma.product.count({ where }),
     ]);
 
+    const withRatings = await this.attachRatings(products);
+
     return {
-      products,
+      products: withRatings,
       meta: {
         page,
         limit,
@@ -124,6 +126,38 @@ export class ProductsService {
         totalPages: Math.ceil(total / limit),
       },
     };
+  }
+
+  /**
+   * Anexa média e contagem de avaliações aprovadas (status APPROVED) aos
+   * produtos, usado nas listagens públicas para exibir nota nos cards.
+   */
+  private async attachRatings<T extends { id: string }>(products: T[]): Promise<Array<T & { rating: { average: number; count: number } }>> {
+    if (products.length === 0) return [];
+
+    const rows = await this.prisma.review.groupBy({
+      by: ['productId', 'rating'],
+      where: { productId: { in: products.map((p) => p.id) }, status: 'APPROVED' },
+      _count: true,
+    });
+
+    const totals = new Map<string, { sum: number; count: number }>();
+    for (const row of rows) {
+      const current = totals.get(row.productId) ?? { sum: 0, count: 0 };
+      current.sum += row.rating * row._count;
+      current.count += row._count;
+      totals.set(row.productId, current);
+    }
+
+    return products.map((product) => {
+      const t = totals.get(product.id);
+      return {
+        ...product,
+        rating: t
+          ? { average: Math.round((t.sum / t.count) * 10) / 10, count: t.count }
+          : { average: 0, count: 0 },
+      };
+    });
   }
 
   /**
@@ -227,7 +261,7 @@ export class ProductsService {
   }
 
   async findFeatured(limit = 10) {
-    return this.prisma.product.findMany({
+    const products = await this.prisma.product.findMany({
       where: {
         isActive: true,
         isFeatured: true,
@@ -240,6 +274,8 @@ export class ProductsService {
       take: limit,
       orderBy: { createdAt: 'desc' },
     });
+
+    return this.attachRatings(products);
   }
 
   async findBestSellers(limit = 10) {
@@ -257,11 +293,11 @@ export class ProductsService {
       take: limit,
     });
 
-    return products;
+    return this.attachRatings(products);
   }
 
   async findOnPromotion(limit = 10) {
-    return this.prisma.product.findMany({
+    const products = await this.prisma.product.findMany({
       where: {
         isActive: true,
         compareAtPrice: { not: null },
@@ -274,6 +310,8 @@ export class ProductsService {
       take: limit,
       orderBy: { createdAt: 'desc' },
     });
+
+    return this.attachRatings(products);
   }
 
   async findRecommendations(productId: string, limit = 6) {
@@ -286,7 +324,7 @@ export class ProductsService {
       return [];
     }
 
-    return this.prisma.product.findMany({
+    const products = await this.prisma.product.findMany({
       where: {
         isActive: true,
         categoryId: product.categoryId,
@@ -300,6 +338,8 @@ export class ProductsService {
       take: limit,
       orderBy: { isFeatured: 'desc' },
     });
+
+    return this.attachRatings(products);
   }
 
   async create(data: {

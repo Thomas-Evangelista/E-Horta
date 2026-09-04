@@ -24,6 +24,7 @@ export interface ProductSummaryDTO {
   compareAtPrice: string | null;
   imageUrl: string | null;
   isFeatured: boolean;
+  rating?: { average: number; count: number };
   category?: { id: string; name: string; slug: string };
   inventory?: { quantity: number; reservedQuantity: number } | null;
 }
@@ -39,6 +40,23 @@ export interface ReviewDTO {
   comment: string | null;
   createdAt: string;
   user: ReviewAuthorDTO;
+}
+
+export interface ReviewSummaryDTO {
+  average: number;
+  total: number;
+  distribution: Record<1 | 2 | 3 | 4 | 5, number>;
+}
+
+export interface MyReviewDTO {
+  id: string;
+  productId: string;
+  orderId: string | null;
+  rating: number;
+  comment: string | null;
+  status: string;
+  createdAt: string;
+  product: { id: string; name: string; slug: string };
 }
 
 export interface ProductDetailDTO extends ProductSummaryDTO {
@@ -124,6 +142,7 @@ export interface Product {
   imageUrl: string | null;
   isFeatured: boolean;
   inStock: boolean;
+  rating?: { average: number; count: number };
   category?: { id: string; name: string; slug: string };
 }
 
@@ -140,6 +159,7 @@ export function mapProduct(dto: ProductSummaryDTO): Product {
     imageUrl: dto.imageUrl,
     isFeatured: dto.isFeatured,
     inStock: quantity === null ? true : quantity > 0,
+    rating: dto.rating,
     category: dto.category,
   };
 }
@@ -299,5 +319,6 @@ export interface NotificationDTO {
   title: string;
   message: string;
   read: boolean;
+  orderId: string | null;
   createdAt: string;
 }

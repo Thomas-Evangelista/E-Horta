@@ -1,5 +1,7 @@
 export const queryKeys = {
   dashboard: ['dashboard'] as const,
+  dashboardTrends: (days: number) => ['dashboard', 'trends', days] as const,
+  dashboardRecentOrders: (limit: number) => ['dashboard', 'recent-orders', limit] as const,
   products: (filters?: Record<string, unknown>) => ['admin', 'products', filters ?? {}] as const,
   productDetail: (id: string) => ['admin', 'products', id] as const,
   orders: (filters?: Record<string, unknown>) => ['admin', 'orders', filters ?? {}] as const,

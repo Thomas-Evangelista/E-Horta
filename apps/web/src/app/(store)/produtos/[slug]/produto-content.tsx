@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { Check, ChevronLeft, Minus, Plus } from 'lucide-react';
 import { ProductCarousel } from '@/components/product/product-carousel';
 import { ReviewForm } from '@/components/product/review-form';
+import { ReviewSummary } from '@/components/product/review-summary';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -14,6 +15,74 @@ import { friendlyMessage } from '@/lib/errors';
 import { formatDiscount, formatDate, formatPrice } from '@/lib/format';
 import { useAddToCart } from '@/hooks/use-cart';
 import { useProduct, useRecommendations } from '@/hooks/use-products';
+import { useProductReviews } from '@/hooks/use-reviews';
+
+function ReviewsSection({ productId }: { productId: string }) {
+  const [limit, setLimit] = useState(5);
+  const { data, isLoading, isError, error } = useProductReviews(productId, limit);
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col gap-3" aria-busy="true">
+        <Skeleton className="h-24 w-full rounded-card" />
+        <Skeleton className="h-20 w-full rounded-card" />
+      </div>
+    );
+  }
+
+  if (isError || !data) {
+    return (
+      <p role="alert" className="text-sm text-red-700">
+        {friendlyMessage(error)}
+      </p>
+    );
+  }
+
+  const { reviews, summary, total } = data;
+
+  return (
+    <div className="flex flex-col gap-4">
+      <ReviewSummary summary={summary} />
+
+      {reviews.length > 0 ? (
+        <>
+          <ul className="flex flex-col gap-3">
+            {reviews.map((review) => (
+              <li key={review.id} className="rounded-xl border border-cream-200 bg-white p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-bold text-ink-800">{review.user.name}</span>
+                  <time dateTime={review.createdAt} className="text-xs text-ink-400">
+                    {formatDate(review.createdAt)}
+                  </time>
+                </div>
+                <p aria-label={`Nota ${review.rating} de 5`} className="mt-1 text-sm text-accent-500">
+                  {'★'.repeat(review.rating)}
+                  <span className="text-cream-300">{'★'.repeat(5 - review.rating)}</span>
+                </p>
+                {review.comment && <p className="mt-1.5 text-sm text-ink-600">{review.comment}</p>}
+              </li>
+            ))}
+          </ul>
+          {reviews.length < total && (
+            <Button
+              variant="outline"
+              className="self-center px-6"
+              loading={isLoading}
+              onClick={() => setLimit((l) => Math.min(total, l + 10))}
+            >
+              Carregar mais avaliações
+            </Button>
+          )}
+        </>
+      ) : (
+        <p className="text-sm text-ink-500">
+          Ainda não há avaliações publicadas para este produto.
+        </p>
+      )}
+    </div>
+  );
+}
+
 
 export function ProdutoContent({ slug }: { slug: string }) {
   const { toast } = useToast();
@@ -183,29 +252,7 @@ export function ProdutoContent({ slug }: { slug: string }) {
           <div className="mb-5">
             <ReviewForm productId={product.id} productSlug={product.slug} productName={product.name} />
           </div>
-          {product.reviews.length > 0 ? (
-            <ul className="flex flex-col gap-3">
-              {product.reviews.slice(0, 5).map((review) => (
-                <li key={review.id} className="rounded-xl border border-cream-200 bg-white p-4">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-bold text-ink-800">{review.user.name}</span>
-                    <time dateTime={review.createdAt} className="text-xs text-ink-400">
-                      {formatDate(review.createdAt)}
-                    </time>
-                  </div>
-                  <p aria-label={`Nota ${review.rating} de 5`} className="mt-1 text-sm text-accent-500">
-                    {'★'.repeat(review.rating)}
-                    <span className="text-cream-300">{'★'.repeat(5 - review.rating)}</span>
-                  </p>
-                  {review.comment && <p className="mt-1.5 text-sm text-ink-600">{review.comment}</p>}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-sm text-ink-500">
-              Ainda não há avaliações publicadas para este produto.
-            </p>
-          )}
+          <ReviewsSection productId={product.id} />
         </section>
       )}
 
