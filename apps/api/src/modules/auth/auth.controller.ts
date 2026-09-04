@@ -8,8 +8,10 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { CartService } from '../cart/cart.service';
+import { AUTH_ENDPOINT_LIMIT } from '../../common/throttler/rate-limit.config';
 import {
   registerSchema,
   loginSchema,
@@ -35,6 +37,7 @@ export class AuthController {
   ) {}
 
   @Public()
+  @Throttle({ default: { limit: AUTH_ENDPOINT_LIMIT, ttl: 60_000 } })
   @Post('register')
   @ApiOperation({ summary: 'Criar conta de usuário' })
   async register(
@@ -55,6 +58,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { limit: AUTH_ENDPOINT_LIMIT, ttl: 60_000 } })
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Fazer login' })
@@ -116,6 +120,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { limit: AUTH_ENDPOINT_LIMIT, ttl: 60_000 } })
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Solicitar redefinição de senha (envia e-mail)' })
@@ -131,6 +136,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { limit: AUTH_ENDPOINT_LIMIT, ttl: 60_000 } })
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Redefinir senha com token' })

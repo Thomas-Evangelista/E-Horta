@@ -80,6 +80,19 @@ Ao receber uma nova solicitação, adicione uma entrada neste formato:
 - **Verificação**: como foi validada (lint/typecheck/testes/E2E)
 ```
 
+### 2026-09-04 — Rate limiting global na API (Fase 28, item 1 do roadmap)
+
+- **Status**: `concluída`
+- **Origem**: pedido do usuário (continuar a Fase 28 de `specs/28-otimizacao-performance-acessibilidade.md`; opções apresentadas → usuário escolheu rate limiting, com autorização para prosseguir)
+- **Solicitação**: adicionar `@nestjs/throttler` com limites globais (100 req/min públicas, 200 req/min autenticadas, 30 req/min de auth) e exceções para `/health`, `/ready`, `/metrics`.
+- **Decisões**:
+  - Guard customizado `RateLimitGuard` (estende `ThrottlerGuard`, v6.5.0), registrado como `APP_GUARD` **após** `RolesGuard` — ordem importa para `req.user` existir no throttling de rotas autenticadas.
+  - 1 throttler default com `limit` como função (≥200 autenticado, ≥100 público), `getTracker` = `user:{id}` vs `ip:{ip}`, `skipIf` para health/ready/metrics; `@Throttle` de 30/min também em `reset-password` (além dos 3 da spec) por ser endpoint sensível de senha.
+  - Erro 429 com envelope da API (`code: 'RATE_LIMITED'`) via `RateLimitException`; sem mudanças no `AllExceptionsFilter`. Comportamento v6: apenas `Retry-After` em resposta bloqueada (sem headers `X-RateLimit-*`).
+  - Correções de ambiente descobertas no e2e (bug pré-existente, não relacionado): `execSync` do `prisma migrate deploy` quebrava com espaço no path no Windows (`"${prismaBin}" ...`) e `apps/api/test/.env` (gitignored) estava ausente → recriado com `e_horta_test` + sandbox/webhook habilitados.
+- **Ações tomadas**: `@nestjs/throttler` no `apps/api`; `common/throttler/` (config, guard, exception, spec unit); `@Throttle` em `auth.controller.ts` (4 endpoints); `test/rate-limit.e2e-spec.ts` (mini-app isolado); fixes de e2e em `test-db.setup.ts` e recriação de `test/.env`; docs (CHANGELOG + spec 28).
+- **Verificação**: `pnpm lint` 0 erros; `pnpm typecheck` (monorepo) OK; `pnpm test` API 24 suítes/233 testes; `pnpm test:e2e` API 2 suítes/31 testes (observação: uma execução de `pnpm test` acusou 2 suítes falhas por `connection refused` transitório do Redis no spec de health — rerun 100% verde).
+
 ### 2026-09-03 — Fluxo de senha completo (recuperar/redefinir/alterar) + gestão de status no Admin
 
 - **Status**: `concluída`

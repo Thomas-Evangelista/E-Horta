@@ -1,6 +1,6 @@
 # 28 — Otimização, Performance e Acessibilidade
 
-**Status:** parcialmente implementada — ver `specs/CHANGELOG.md` ("Fase 28 (parcial)") para o que já foi adiantado (skip link, `aria-*` em paginação/navegação do admin, `ConfirmDialog` acessível e PWA install prompt). As seções de **Performance — Backend**, **Performance — Frontend** (imagens/prefetch) e o restante de **Acessibilidade** abaixo ainda não foram iniciadas.
+**Status:** parcialmente implementada — já concluídos: skip link, `aria-*` em paginação/navegação do admin, `ConfirmDialog` acessível, PWA install prompt e o **rate limiting global da API** (ver `specs/CHANGELOG.md`, "Fase 28 (continuação)"). Itens restantes dos primeiros itens do roadmap — **Cache Redis**, **Índices Prisma**, **Performance — Frontend** (imagens/prefetch), PWA completo e restante de **Acessibilidade** — ainda não iniciados.
 **Objetivo:** fechar os gaps de performance, PWA e acessibilidade identificados nas fases anteriores, preparando o projeto para produção.
 
 ---
@@ -23,13 +23,14 @@
   - `reviews`: `(product_id, status)` (já existe parcial)
 - `prisma migrate dev` + validação com `EXPLAIN ANALYZE`
 
-### Rate limiting
+### Rate limiting — ✅ concluído
 
-- Adicionar `@nestjs/throttler` com throttling global:
+- `@nestjs/throttler@6.5.0` com throttling global (`RateLimitGuard` custom registrado como `APP_GUARD`):
   - 100 req/min para rotas públicas
   - 200 req/min para rotas autenticadas
-  - 30 req/min para rotas de auth (`/auth/login`, `/auth/register`, `/auth/forgot-password`)
+  - 30 req/min para rotas de auth (`/auth/login`, `/auth/register`, `/auth/forgot-password`, `/auth/reset-password`)
 - Exceções: `/health`, `/ready`, `/metrics`
+- Detalhes/documentação: `apps/api/src/common/throttler/` e `specs/CHANGELOG.md`.
 
 ---
 

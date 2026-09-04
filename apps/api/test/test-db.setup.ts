@@ -24,7 +24,7 @@ export function migrateTestDatabase(): void {
       : 'prisma');
 
   execSync(
-    `${prismaBin} migrate deploy --schema=../../../prisma/schema.prisma`,
+    `"${prismaBin}" migrate deploy --schema=../../../prisma/schema.prisma`,
     {
       cwd: __dirname,
       env: { ...process.env, DATABASE_URL: TEST_DATABASE_URL, NODE_ENV: 'test' },

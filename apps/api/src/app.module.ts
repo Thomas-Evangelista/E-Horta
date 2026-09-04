@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD, APP_FILTER } from '@nestjs/core';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { DatabaseModule } from './database/database.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { ObservabilityModule } from './modules/observability/observability.module';
@@ -23,6 +24,8 @@ import { AdminModule } from './modules/admin/admin.module';
 import { configValidation } from './config/config.validation';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
+import { RateLimitGuard } from './common/throttler/rate-limit.guard';
+import { rateLimitConfig } from './common/throttler/rate-limit.config';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
 @Module({
@@ -38,6 +41,7 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
           : ['.env.local', '.env', '../../.env.local', '../../.env'],
     }),
     DatabaseModule,
+    ThrottlerModule.forRoot(rateLimitConfig),
     AuditModule,
     ObservabilityModule,
     HealthModule,
@@ -65,6 +69,10 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
     {
       provide: APP_GUARD,
       useClass: RolesGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: RateLimitGuard,
     },
     {
       provide: APP_FILTER,

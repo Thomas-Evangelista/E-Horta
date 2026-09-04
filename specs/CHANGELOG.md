@@ -4,6 +4,32 @@ Registro de modificações do projeto, organizado por fase de implementação.
 
 ---
 
+## Fase 28 (continuação) — Rate limiting na API
+
+**Escopo:** primeiro item de performance/segurança do roadmap de `specs/28-otimizacao-performance-acessibilidade.md` — throttling global com `@nestjs/throttler`: 100 req/min públicas, 200 req/min autenticadas, 30 req/min nos endpoints sensíveis de auth.
+
+### Rate limiting (API)
+
+- `@nestjs/throttler@6.5.0` adicionado ao `apps/api`.
+- Novo guard customizado [`rate-limit.guard.ts`](../apps/api/src/common/throttler/rate-limit.guard.ts) (estende `ThrottlerGuard`) com `throwThrottlingException`/`getTracker`/`skipIf` sobrescritos, registrado como `APP_GUARD` após `RolesGuard` — a ordem importa para que `req.user` exista no throttling de rotas autenticadas.
+- Nova config [`rate-limit.config.ts`](../apps/api/src/common/throttler/rate-limit.config.ts): 1 throttler default com `limit` como função por request (`req.user` presente → `AUTH_LIMIT=200`, senão → `PUBLIC_LIMIT=100`), `getTracker` = `user:{id}` (autenticado) / `ip:{ip}` (anônimo) e `skipIf` para `/api/v1/health`, `/api/v1/ready`, `/api/v1/metrics`.
+- `@Throttle` (30 req/min) aplicado em `register`, `login`, `forgot-password` e `reset-password` (`auth.controller.ts`) — os 3 primeiros previstos na spec, `reset-password` incluído por ser da mesma classe de endpoint (senha/brute force). Demais rotas sem anotação usam o limite global.
+- Erro 429 no formato da API: [`rate-limit.exception.ts`](../apps/api/src/common/throttler/rate-limit.exception.ts) → `RateLimitException` (`HttpException` 429, `{ code: 'RATE_LIMITED', message: 'Muitas requisições. Tente novamente em instantes', details: null }`), formatado/logado pelo `AllExceptionsFilter` existente (sem mudanças no filter). O guard dispara `Retry-After` na resposta bloqueada (comportamento do throttler v6).
+
+### Correções de ambiente (testes E2E em Windows nativo)
+
+- `test-db.setup.ts`: `execSync` do `prisma migrate deploy` falhava no Windows com espaço no caminho (`C:\Users\Thomas Evangelista\...`) — comando passou a citar o binário (`"${prismaBin}" ...`). Sem isso a suite E2E nunca rodava nativamente.
+- Recriado `apps/api/test/.env` (gitignored) com banco isolado `e_horta_test`, sandbox de pagamento habilitado e webhook assinado — necessário para o bootstrap do e2e em `NODE_ENV=test`.
+
+### Verificação
+
+- `pnpm lint`: 0 erros (115 warnings pré-existentes, sem novos).
+- `pnpm typecheck` (todo o monorepo): limpo.
+- `pnpm test` (API): 24 suítes / 233 testes passando (7 novos do guard — uma execução anterior acusou 2 suítes falhas por `connection refused` transitório do Redis no spec de health; rerun 100% verde).
+- `pnpm test:e2e` (API): 2 suítes / 31 testes passando (29 existentes + 2 novos de rate limit — mini-app isolado com limite 2, sem depender de banco).
+
+---
+
 ## Fase 28 (parcial) — Avaliações, notificações paginadas, dashboard com tendências e acessibilidade
 
 **Escopo:** itens antecipados do roadmap de `specs/28-otimizacao-performance-acessibilidade.md` (seção de acessibilidade e parte de performance de UX), implementados junto com melhorias de avaliações/notificações que não estavam previamente registradas.
