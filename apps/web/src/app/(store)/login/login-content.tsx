@@ -108,6 +108,14 @@ export function LoginContent() {
           error={errors.password?.message}
           {...register('password')}
         />
+        <div className="-mt-1 text-right">
+          <Link
+            href="/esqueci-senha"
+            className="text-xs font-medium text-accent-600 hover:underline"
+          >
+            Esqueci minha senha?
+          </Link>
+        </div>
         <Button type="submit" size="lg" loading={isSubmitting} className="mt-1">
           Entrar
         </Button>

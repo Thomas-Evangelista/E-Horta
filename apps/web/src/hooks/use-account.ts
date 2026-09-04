@@ -47,3 +47,19 @@ export function useSetDefaultAddress() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['addresses'] }),
   });
 }
+
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: async (input: {
+      currentPassword: string;
+      newPassword: string;
+      confirmPassword: string;
+    }) => {
+      const envelope = await apiRequest<{ message: string }>('/auth/change-password', {
+        method: 'POST',
+        body: input,
+      });
+      return envelope.data;
+    },
+  });
+}

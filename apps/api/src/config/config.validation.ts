@@ -8,6 +8,7 @@ const configSchema = z.object({
   JWT_SECRET: z.string().min(32),
   JWT_REFRESH_SECRET: z.string().min(32),
   CORS_ORIGIN: z.string().default('http://localhost:3000'),
+  SITE_URL: z.string().url().default('http://localhost:3000'),
   SHIPPING_STANDARD_FEE: z.coerce.number().min(0).default(9.9),
   SHIPPING_EXPRESS_FEE: z.coerce.number().min(0).default(14.9),
   SHIPPING_STANDARD_DAYS: z.coerce.number().int().min(0).default(2),

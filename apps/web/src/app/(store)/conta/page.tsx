@@ -7,8 +7,10 @@ import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   ChevronDown,
+  KeyRound,
   LogOut,
   MapPin,
+  MessageSquare,
   Pencil,
   Plus,
   Star,
@@ -19,12 +21,21 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { PasswordStrengthMeter } from '@/components/ui/password-strength-meter';
 import { AddressForm } from '@/components/address/address-form';
 import { useToast } from '@/components/feedback/toast';
 import { friendlyMessage } from '@/lib/errors';
+import { applyApiFieldErrors } from '@/lib/form-errors';
+import { formatDate } from '@/lib/format';
 import { logoutRequest, useSessionStore } from '@/stores/session';
 import { useAddresses } from '@/hooks/use-checkout';
-import { useDeleteAddress, useSetDefaultAddress, useUpdateProfile } from '@/hooks/use-account';
+import { useMyReviews, useDeleteReview } from '@/hooks/use-reviews';
+import {
+  useDeleteAddress,
+  useSetDefaultAddress,
+  useUpdateProfile,
+  useChangePassword,
+} from '@/hooks/use-account';
 
 function ProfileSection() {
   const user = useSessionStore((state) => state.user)!;
@@ -250,6 +261,223 @@ function AddressesSection() {
   );
 }
 
+function PasswordSection() {
+  const changePassword = useChangePassword();
+  const clearSession = useSessionStore((state) => state.clearSession);
+  const [editing, setEditing] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [fieldError, setFieldError] = useState<Record<string, string>>({});
+  const { toast } = useToast();
+
+  function resetForm() {
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setFieldError({});
+  }
+
+  async function handleSave() {
+    if (!currentPassword) {
+      setFieldError({ currentPassword: 'Informe sua senha atual' });
+      return;
+    }
+    if (newPassword.length < 8) {
+      setFieldError({ newPassword: 'A nova senha deve ter no mínimo 8 caracteres' });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setFieldError({ confirmPassword: 'As senhas não conferem' });
+      return;
+    }
+    try {
+      await changePassword.mutateAsync({
+        currentPassword,
+        newPassword,
+        confirmPassword,
+      });
+      setEditing(false);
+      resetForm();
+      clearSession();
+      toast('success', 'Senha alterada. Faça login novamente.');
+    } catch (error) {
+      const handled = applyApiFieldErrors(error, (field, fieldError) => {
+        const name = field as 'currentPassword' | 'newPassword' | 'confirmPassword';
+        setFieldError((prev) => ({ ...prev, [name]: fieldError.message }));
+      });
+      if (!handled) {
+        toast('error', friendlyMessage(error));
+      }
+    }
+  }
+
+  return (
+    <section className="rounded-card border border-cream-200 bg-white p-4 shadow-card">
+      <header className="mb-3 flex items-center gap-2.5">
+        <KeyRound size={18} aria-hidden className="text-accent-500" />
+        <h2 className="text-base font-bold text-ink-900">Alterar senha</h2>
+        <button
+          type="button"
+          aria-expanded={editing}
+          aria-label={editing ? 'Fechar formulário' : 'Alterar senha'}
+          onClick={() => {
+            if (editing) resetForm();
+            setEditing((open) => !open);
+          }}
+          className="ml-auto flex h-8 w-8 items-center justify-center rounded-full bg-cream-100 text-ink-600 transition-transform hover:bg-cream-200 active:scale-90"
+        >
+          {editing ? <X size={15} aria-hidden /> : <Pencil size={15} aria-hidden />}
+        </button>
+      </header>
+
+      <AnimatePresence initial={false}>
+        {editing && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            className="overflow-hidden"
+          >
+            <div className="flex flex-col gap-3 border-t border-cream-200 pt-4">
+              <Input
+                label="Senha atual"
+                type="password"
+                autoComplete="current-password"
+                value={currentPassword}
+                onChange={(event) => setCurrentPassword(event.target.value)}
+                error={fieldError.currentPassword}
+              />
+              <Input
+                label="Nova senha"
+                type="password"
+                autoComplete="new-password"
+                hint="Mínimo de 8 caracteres"
+                value={newPassword}
+                onChange={(event) => setNewPassword(event.target.value)}
+                error={fieldError.newPassword}
+              />
+              <PasswordStrengthMeter password={newPassword} />
+              <Input
+                label="Confirmar nova senha"
+                type="password"
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                error={fieldError.confirmPassword}
+              />
+              <Button onClick={() => void handleSave()} loading={changePassword.isPending} className="w-full">
+                Alterar senha
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </section>
+  );
+}
+
+function MyReviewsSection() {
+  const { toast } = useToast();
+  const { data: reviews, isLoading, isError, error, refetch } = useMyReviews();
+  const deleteReview = useDeleteReview();
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+
+  async function handleDelete(reviewId: string) {
+    try {
+      await deleteReview.mutateAsync(reviewId);
+      setConfirmId(null);
+      toast('success', 'Avaliação removida.');
+    } catch (err) {
+      toast('error', friendlyMessage(err));
+    }
+  }
+
+  return (
+    <section className="rounded-card border border-cream-200 bg-white p-4 shadow-card">
+      <header className="mb-3 flex items-center gap-2.5">
+        <MessageSquare size={18} aria-hidden className="text-accent-500" />
+        <h2 className="text-base font-bold text-ink-900">Minhas avaliações</h2>
+      </header>
+
+      {isLoading && (
+        <div className="flex flex-col gap-2" aria-busy="true">
+          <Skeleton className="h-16 w-full rounded-xl" />
+          <Skeleton className="h-16 w-full rounded-xl" />
+        </div>
+      )}
+
+      {isError && (
+        <div className="flex flex-col items-start gap-2 text-sm text-red-700">
+          <p>{friendlyMessage(error)}</p>
+          <button type="button" onClick={() => refetch()} className="font-semibold text-accent-600 hover:underline">
+            Tentar novamente
+          </button>
+        </div>
+      )}
+
+      {!isLoading && !isError && (!reviews || reviews.length === 0) && (
+        <p className="text-sm text-ink-500">
+          Você ainda não avaliou nenhum produto. Após receber um pedido, você pode avaliar os produtos comprados.
+        </p>
+      )}
+
+      {!isLoading && !isError && reviews && reviews.length > 0 && (
+        <ul className="flex flex-col gap-3">
+          {reviews.map((review) => (
+            <li key={review.id} className="flex flex-col gap-1.5 rounded-xl border border-cream-200 p-3">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="font-medium leading-snug text-ink-800">{review.product.name}</p>
+                  <p aria-label={`Nota ${review.rating} de 5`} className="mt-0.5 text-sm text-accent-500">
+                    {'★'.repeat(review.rating)}
+                    <span className="text-cream-300">{'★'.repeat(5 - review.rating)}</span>
+                  </p>
+                </div>
+                {confirmId === review.id ? (
+                  <div className="flex shrink-0 items-center gap-2 text-xs">
+                    <span className="text-ink-500">Remover?</span>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(review.id)}
+                      disabled={deleteReview.isPending}
+                      className="font-semibold text-red-600 hover:underline"
+                    >
+                      Sim
+                    </button>
+                    <button type="button" onClick={() => setConfirmId(null)} className="font-semibold text-ink-500 hover:underline">
+                      Não
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    aria-label={`Remover avaliação de ${review.product.name}`}
+                    onClick={() => setConfirmId(review.id)}
+                    className="shrink-0 rounded-full p-1.5 text-ink-400 hover:bg-red-50 hover:text-red-600"
+                  >
+                    <Trash2 size={15} aria-hidden />
+                  </button>
+                )}
+              </div>
+              {review.comment && <p className="text-sm text-ink-600">{review.comment}</p>}
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-ink-400">
+                  {review.status === 'APPROVED' ? 'Publicada' : review.status === 'PENDING' ? 'Aguardando moderação' : 'Não aprovada'}
+                </span>
+                <time dateTime={review.createdAt} className="text-xs text-ink-400">
+                  {formatDate(review.createdAt)}
+                </time>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 export default function ContaPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -292,6 +520,10 @@ export default function ContaPage() {
       <ProfileSection />
 
       <AddressesSection />
+
+      <PasswordSection />
+
+      <MyReviewsSection />
 
       <details className="group rounded-card border border-cream-200 bg-white shadow-card">
         <summary className="flex cursor-pointer list-none items-center gap-2.5 p-4 text-sm font-semibold text-ink-700 [&::-webkit-details-marker]:hidden">

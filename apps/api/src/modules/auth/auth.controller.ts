@@ -13,8 +13,14 @@ import { CartService } from '../cart/cart.service';
 import {
   registerSchema,
   loginSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+  changePasswordSchema,
   type RegisterDto,
   type LoginDto,
+  type ForgotPasswordDto,
+  type ResetPasswordDto,
+  type ChangePasswordDto,
 } from './auth.validation';
 import { CurrentUser, Public } from '../../common/decorators';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -102,6 +108,53 @@ export class AuthController {
   @ApiOperation({ summary: 'Obter dados do usuário logado' })
   async me(@CurrentUser() user: { id: string }) {
     const result = await this.authService.getMe(user.id);
+    return {
+      data: result,
+      meta: {},
+      error: null,
+    };
+  }
+
+  @Public()
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Solicitar redefinição de senha (envia e-mail)' })
+  async forgotPassword(
+    @Body(new ZodValidationPipe(forgotPasswordSchema)) dto: ForgotPasswordDto,
+  ) {
+    const result = await this.authService.forgotPassword(dto);
+    return {
+      data: result,
+      meta: {},
+      error: null,
+    };
+  }
+
+  @Public()
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Redefinir senha com token' })
+  async resetPassword(
+    @Body(new ZodValidationPipe(resetPasswordSchema)) dto: ResetPasswordDto,
+  ) {
+    const result = await this.authService.resetPassword(dto);
+    return {
+      data: result,
+      meta: {},
+      error: null,
+    };
+  }
+
+  @Post('change-password')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Alterar a própria senha (requer senha atual)' })
+  async changePassword(
+    @CurrentUser() user: { id: string },
+    @Body(new ZodValidationPipe(changePasswordSchema)) dto: ChangePasswordDto,
+  ) {
+    const result = await this.authService.changePassword(user.id, dto);
     return {
       data: result,
       meta: {},

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/api-client';
 import { queryKeys } from '@/lib/admin/query-keys';
 import { formatDateTime } from '@/lib/format';
@@ -13,20 +13,36 @@ import { EmptyState } from '@/components/admin/ui/empty-state';
 import { Badge } from '@/components/admin/ui/badge';
 import { Select } from '@/components/admin/ui/select';
 import { Pagination } from '@/components/admin/ui/pagination';
+import { Button } from '@/components/admin/ui/button';
+import { Modal } from '@/components/admin/ui/modal';
+import { useToast } from '@/components/admin/feedback/toast';
 import { friendlyMessage } from '@/lib/errors';
-import { Search } from 'lucide-react';
+import { Settings2, Search } from 'lucide-react';
 
 type User = {
   id: string; name: string; email: string; role: string; status: string;
   createdAt: string; _count?: { orders: number };
 };
 
+type UserStatus = 'ACTIVE' | 'INACTIVE' | 'BLOCKED';
+
+const STATUS_OPTIONS: UserStatus[] = ['ACTIVE', 'INACTIVE', 'BLOCKED'];
+
+const STATUS_VERB: Record<UserStatus, string> = {
+  ACTIVE: 'ativar',
+  INACTIVE: 'inativar',
+  BLOCKED: 'bloquear',
+};
+
 export default function UsersPage() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [target, setTarget] = useState<{ user: User; status?: UserStatus; action?: UserStatus } | null>(null);
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: queryKeys.users({ page, search, role: roleFilter, status: statusFilter }),
@@ -37,6 +53,33 @@ export default function UsersPage() {
       return env;
     },
   });
+
+  const statusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: UserStatus }) => {
+      const env = await apiRequest<{ id: string; name: string; email: string; role: string; status: string; createdAt: string }>(`/admin/users/${id}/status`, {
+        method: 'PATCH',
+        body: { status },
+      });
+      return env.data;
+    },
+    onSuccess: (updated) => {
+      const label = USER_STATUS_LABELS[updated.status] ?? updated.status;
+      toast('success', `Usuário agora está ${label.toLowerCase()}.`);
+      queryClient.invalidateQueries({ queryKey: queryKeys.users({}) });
+      setTarget(null);
+    },
+    onError: (err) => {
+      toast('error', friendlyMessage(err));
+      setTarget(null);
+    },
+  });
+
+  const canManage = (user: User) => user.role === 'CUSTOMER';
+
+  function confirmStatusChange(status: UserStatus) {
+    if (!target) return;
+    statusMutation.mutate({ id: target.user.id, status });
+  }
 
   const users = data?.data?.users ?? [];
   const meta = data?.meta;
@@ -98,6 +141,7 @@ export default function UsersPage() {
                   <th className="px-5 py-3 text-center">Status</th>
                   <th className="px-5 py-3 text-center">Pedidos</th>
                   <th className="px-5 py-3">Cadastro</th>
+                  <th className="px-5 py-3 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -119,6 +163,16 @@ export default function UsersPage() {
                     </td>
                     <td className="px-5 py-3 text-center text-ink-500">{u._count?.orders ?? 0}</td>
                     <td className="px-5 py-3 text-xs text-ink-400">{formatDateTime(u.createdAt)}</td>
+                    <td className="px-5 py-3 text-right">
+                      {canManage(u) ? (
+                        <Button variant="outline" size="sm" onClick={() => setTarget({ user: u })}>
+                          <Settings2 size={15} aria-hidden />
+                          Gerenciar
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-ink-300">—</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -127,6 +181,45 @@ export default function UsersPage() {
           {meta && <Pagination page={meta.page ?? 1} totalPages={meta.totalPages ?? 1} onPageChange={setPage} />}
         </Card>
       )}
+
+      <Modal
+        open={!!target}
+        onClose={() => setTarget(null)}
+        title={target ? `Gerenciar status de ${target.user.name}` : ''}
+        footer={
+          target && (
+            <div className="flex flex-wrap justify-end gap-2">
+              {STATUS_OPTIONS.filter((s) => s !== target.user.status).length > 0 ? (
+                STATUS_OPTIONS.filter((s) => s !== target.user.status).map((status) => (
+                  <Button
+                    key={status}
+                    variant={status === 'BLOCKED' ? 'danger' : status === 'INACTIVE' ? 'outline' : 'secondary'}
+                    size="sm"
+                    loading={statusMutation.isPending}
+                    onClick={() => confirmStatusChange(status)}
+                  >
+                    {STATUS_VERB[status]}
+                  </Button>
+                ))
+              ) : (
+                <span className="text-sm text-ink-400">Nenhuma ação disponível</span>
+              )}
+            </div>
+          )
+        }
+      >
+        {target && (
+          <div className="text-sm text-ink-600">
+            <p className="font-medium text-ink-800">{target.user.email}</p>
+            <p className="mt-2">Escolha o novo status do usuário:</p>
+            {target.user.status === 'BLOCKED' && (
+              <p className="mt-1 text-xs text-red-600">
+                O usuário não poderá mais entrar na conta enquanto estiver bloqueado.
+              </p>
+            )}
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
